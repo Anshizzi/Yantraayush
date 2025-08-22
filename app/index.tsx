@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, Platform, KeyboardAvoidingView, ActivityIndicator, Image
+  Alert, Platform, KeyboardAvoidingView, ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -16,13 +16,12 @@ const API_BASE = Platform.select({
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false); // State for loading indicator
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleLogin = async () => {
-    if (loading) return; // Prevent multiple clicks while loading
+    if (loading) return;
     setLoading(true);
-
     try {
       const response = await fetch(`${API_BASE}/login`, {
         method: 'POST',
@@ -37,57 +36,43 @@ export default function LoginScreen() {
     } catch (error: any) {
       Alert.alert('Login Error', error.message || 'Could not connect to the server.');
     } finally {
-      setLoading(false); // Stop loading indicator
+      setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <View style={styles.loginCard}>
-        <Image source={require('@/assets/images/icon.png')} style={styles.logo} />
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.container}>
+      <View style={styles.card}>
         <Text style={styles.title}>Login</Text>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Username</Text>
+          <Text style={styles.label}>Username:</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter your username"
-            placeholderTextColor="#555"
             value={username}
             onChangeText={setUsername}
             autoCapitalize="none"
+            placeholderTextColor="#555"
           />
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Password</Text>
+          <Text style={styles.label}>Password:</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter your password"
-            placeholderTextColor="#555"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            placeholderTextColor="#555"
           />
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.buttonText}>Login</Text>
-          )}
+        <TouchableOpacity style={styles.buttonPrimary} onPress={handleLogin} disabled={loading}>
+          {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonTextPrimary}>Login</Text>}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.createAccountButton}
-          onPress={() => router.push('/signup')}
-          disabled={loading}
-        >
-          <Text style={styles.createAccountButtonText}>Create an account</Text>
+        <TouchableOpacity style={styles.buttonSecondary} onPress={() => router.push('/signup')} disabled={loading}>
+          <Text style={styles.buttonTextSecondary}>Create an account</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -99,74 +84,68 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#121212',
+    backgroundColor: '#0B101B', // Dark blue background
   },
-  loginCard: {
-    backgroundColor: '#1E1E1E',
+  card: {
+    backgroundColor: '#161D2B', // Darker card color
     borderRadius: 12,
-    paddingVertical: 30,
-    paddingHorizontal: 25,
+    padding: 30,
     width: '90%',
-    maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
-    alignItems: 'center',
-  },
-  logo: {
-    width: 80,
-    height: 80,
-    marginBottom: 20,
+    maxWidth: 360,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 25,
+    marginBottom: 30,
     textAlign: 'center',
   },
   inputContainer: {
     width: '100%',
-    marginBottom: 15,
+    marginBottom: 20,
   },
   label: {
-    color: '#AAA',
+    color: '#AAB3C4',
     marginBottom: 8,
     fontSize: 14,
   },
   input: {
     height: 50,
-    borderColor: '#333',
+    borderColor: '#344054',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 15,
     color: '#FFFFFF',
-    backgroundColor: '#2A2A2A',
+    backgroundColor: '#0B101B',
     fontSize: 16,
   },
-  button: {
-    backgroundColor: '#3777F0',
+  buttonPrimary: {
+    backgroundColor: '#4A80F0',
     borderRadius: 8,
-    paddingVertical: 15,
-    alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
+    alignItems: 'center',
     width: '100%',
     height: 50,
+    marginTop: 10,
   },
-  buttonText: {
+  buttonTextPrimary: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  createAccountButton: {
-    marginTop: 20,
-    paddingVertical: 10,
+  buttonSecondary: {
+    borderColor: '#4A80F0',
+    borderWidth: 1,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: 50,
+    marginTop: 15,
   },
-  createAccountButtonText: {
-    color: '#3777F0',
-    fontSize: 14,
+  buttonTextSecondary: {
+    color: '#4A80F0',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
