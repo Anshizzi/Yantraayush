@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "backend": "cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
+    "main": "expo-router/entry",
     "frontend": "npm --prefix frontend start",
     "start": "npm run frontend",
     "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
@@ -11,12 +12,21 @@
     "ios": "npm --prefix frontend run ios",
     "web": "npm --prefix frontend run web",
     "lint": "npm --prefix frontend run lint",
-    "reset-project": "npm --prefix frontend run reset-project"
+    "reset-project": "npm --prefix frontend run reset-project",
+    "doctor": "expo-doctor"
   },
   "devDependencies": {
-    "concurrently": "^9.2.0"
+    "concurrently": "^9.2.0",
+    "expo-doctor": "^1.17.0"
   },
   "dependencies": {
-    "expo": "^53.0.20"
+    "expo": "^53.0.20",
+    "expo-router": "^5.1.4",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.11.1",
+    "react": "19.0.0",
+    "react-native": "0.79.5",
+    "expo-constants": "~17.1.7",
+    "expo-linking": "~7.1.7"
   }
 }
