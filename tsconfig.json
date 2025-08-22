@@ -1,3 +1,4 @@
+// In frontend/tsconfig.json
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {

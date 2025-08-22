@@ -1,3 +1,4 @@
+// In frontend/babel.config.js
 module.exports = function (api) {
   api.cache(true);
   return {
@@ -7,12 +8,11 @@ module.exports = function (api) {
         'module-resolver',
         {
           alias: {
-            // This defines the "@" shortcut
             '@': './',
           },
         },
       ],
-      // Make sure reanimated plugin is always last
+      // Reanimated plugin must be last
       'react-native-reanimated/plugin',
     ],
   };
