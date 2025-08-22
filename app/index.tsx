@@ -1,5 +1,3 @@
-// In frontend/app/index.tsx
-
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
@@ -7,11 +5,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 
-const API_BASE = Platform.select({
-  ios: "http://localhost:8000",
-  android: "http://10.0.2.2:8000",
-  default: "http://localhost:8000",
-});
+const API_BASE = "http://172.20.20.188:8000";
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
@@ -84,10 +78,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0B101B', // Dark blue background
+    backgroundColor: '#0B101B',
   },
   card: {
-    backgroundColor: '#161D2B', // Darker card color
+    backgroundColor: '#161D2B',
     borderRadius: 12,
     padding: 30,
     width: '90%',
