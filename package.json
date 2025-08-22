@@ -16,17 +16,22 @@
     "doctor": "expo-doctor"
   },
   "devDependencies": {
+    "babel-plugin-module-resolver": "^5.0.2",
     "concurrently": "^9.2.0",
     "expo-doctor": "^1.17.0"
   },
   "dependencies": {
     "expo": "^53.0.20",
+    "expo-constants": "~17.1.7",
+    "expo-linking": "~7.1.7",
     "expo-router": "^5.1.4",
+    "expo-status-bar": "~2.2.3",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-native": "0.79.5",
+    "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
-    "react": "19.0.0",
-    "react-native": "0.79.5",
-    "expo-constants": "~17.1.7",
-    "expo-linking": "~7.1.7"
+    "react-native-web": "^0.20.0"
   }
 }
