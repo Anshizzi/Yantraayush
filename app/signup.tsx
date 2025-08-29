@@ -5,11 +5,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 
-// Use your computer's specific IP address here
-const API_BASE = "http://172.20.20.188:8000";
+//computers ka ip address
+const API_BASE = "http://192.168.25.1:8000";
 
 export default function SignUpScreen() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -21,13 +21,19 @@ export default function SignUpScreen() {
       const response = await fetch(`${API_BASE}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
+      
       const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || 'Sign-up failed');
-      Alert.alert('Success', data.message || 'Account created!');
-      router.replace('/(tabs)/');
-    } catch (error: any) {
+
+      if (!response.ok) {
+        // Use the detailed error message from the backend
+        throw new Error(data.detail || 'Sign-up failed');
+      }
+
+      Alert.alert('Success', 'Account created successfully! Please log in.');
+      router.replace('/login'); // Navigate to login screen after success
+    } catch (error: any) { // Added ': any' to type the error object for TypeScript
       Alert.alert('Sign-Up Error', error.message || 'Could not create account.');
     } finally {
       setLoading(false);
@@ -40,12 +46,14 @@ export default function SignUpScreen() {
         <Text style={styles.title}>Create Account</Text>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Username:</Text>
+          <Text style={styles.label}>Email:</Text>
           <TextInput
             style={styles.input}
-            value={username}
-            onChangeText={setUsername}
+            value={email}
+            onChangeText={setEmail}
             autoCapitalize="none"
+            keyboardType="email-address"
+            placeholder="Enter your email"
             placeholderTextColor="#555"
           />
         </View>
@@ -57,6 +65,7 @@ export default function SignUpScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            placeholder="Enter your password"
             placeholderTextColor="#555"
           />
         </View>
@@ -73,7 +82,6 @@ export default function SignUpScreen() {
   );
 }
 
-// Re-using the same styles for consistency
 const styles = StyleSheet.create({
   container: {
     flex: 1,
