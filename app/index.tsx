@@ -1,6 +1,6 @@
 // In frontend/app/index.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Alert, Platform, KeyboardAvoidingView, ActivityIndicator, StatusBar
@@ -8,7 +8,12 @@ import {
 import { useRouter } from 'expo-router';
 import { Video } from 'expo-av';
 import { BlurView } from 'expo-blur';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+
+// This makes sure that the browser window closes correctly after authentication.
+WebBrowser.maybeCompleteAuthSession();
 
 const API_BASE = Platform.select({
   ios: "http://localhost:8000",
@@ -22,7 +27,29 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  // --- NEW: Google Authentication Hook ---
+  // Note: For this to fully work, you'll need to create Client IDs in the Google Cloud Console.
+  // For now, you can see the flow, but it may show an error until valid IDs are provided.
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    clientId: "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+    iosClientId: "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
+    androidClientId: "YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com",
+  });
+
+  // --- NEW: Handle the response from Google's login screen ---
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { id_token } = response.params;
+      // In a real app, you'd send this id_token to your backend.
+      // For now, we'll just log it and show an alert.
+      console.log("Google ID Token: ", id_token);
+      Alert.alert("Login Success", "Successfully signed in with Google!");
+      // You could navigate the user away here, e.g., router.replace('/(tabs)/');
+    }
+  }, [response]);
+
   const handleLogin = async () => {
+    // ... (Your existing email/password login logic remains unchanged)
     if (!email || !password) {
       Alert.alert('Error', 'Please enter both email and password.');
       return;
@@ -91,6 +118,25 @@ export default function LoginScreen() {
             {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.buttonTextPrimary}>Sign In</Text>}
           </TouchableOpacity>
 
+          {/* --- NEW: Separator and Google Button --- */}
+          <View style={styles.separatorContainer}>
+              <View style={styles.separatorLine} />
+              <Text style={styles.separatorText}>OR</Text>
+              <View style={styles.separatorLine} />
+          </View>
+
+          <TouchableOpacity
+            style={styles.googleButton}
+            disabled={!request}
+            onPress={() => {
+              promptAsync();
+            }}
+          >
+            <FontAwesome name="google" size={20} color="#FFFFFF" />
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
+          </TouchableOpacity>
+          {/* --- End of new section --- */}
+
           <View style={styles.footer}>
             <Text style={styles.footerText}>Don't have an account? </Text>
             <TouchableOpacity onPress={() => router.push('/signup')} disabled={loading}>
@@ -119,7 +165,7 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     borderRadius: 20,
     padding: 25,
-    overflow: 'hidden', // Important for BlurView border radius
+    overflow: 'hidden',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
@@ -156,7 +202,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     height: 50,
-    marginTop: 20,
+    marginTop: 10, // Adjusted margin
   },
   buttonTextPrimary: {
     color: '#000000',
@@ -175,5 +221,38 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  // --- NEW STYLES ---
+  separatorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginVertical: 20,
+  },
+  separatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  separatorText: {
+    color: '#BBBBBB',
+    marginHorizontal: 10,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: 50,
+  },
+  googleButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 10,
   },
 });
