@@ -23,7 +23,7 @@ export default function LoginScreen() {
     if (loading) return;
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/login`, {
+      const response = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -84,10 +84,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0B101B', // Dark blue background
+    backgroundColor: '#0B101B',
   },
   card: {
-    backgroundColor: '#161D2B', // Darker card color
+    backgroundColor: '#161D2B', 
     borderRadius: 12,
     padding: 30,
     width: '90%',

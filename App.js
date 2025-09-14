@@ -35,8 +35,7 @@ export default function App() {
         return;
       }
 
-      // We send 'email' (frontend) — backend accepts username OR email
-      const response = await fetch(`${API_BASE}/login`, {
+      const response = await fetch(`${API_BOLD}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),

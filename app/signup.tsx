@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 
-//computers ka ip address
+//computer's current IP address
 const API_BASE = "http://192.168.25.1:8000";
 
 export default function SignUpScreen() {
@@ -27,14 +27,23 @@ export default function SignUpScreen() {
       const data = await response.json();
 
       if (!response.ok) {
-        // Use the detailed error message from the backend
-        throw new Error(data.detail || 'Sign-up failed');
+        let errorMessage = 'Sign-up failed.'; // Default message
+        
+        if (response.status === 422 && data.detail && Array.isArray(data.detail)) {
+          const firstError = data.detail[0];
+          errorMessage = `Invalid ${firstError.loc[1]}: ${firstError.msg}`;
+        } 
+        else if (data.detail) {
+          errorMessage = data.detail;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       Alert.alert('Success', 'Account created successfully! Please log in.');
-      router.replace('/login'); // Navigate to login screen after success
-    } catch (error: any) { // Added ': any' to type the error object for TypeScript
-      Alert.alert('Sign-Up Error', error.message || 'Could not create account.');
+      router.replace('/login');
+    } catch (error: any) {
+      Alert.alert('Sign-Up Error', error.message);
     } finally {
       setLoading(false);
     }
