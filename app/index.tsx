@@ -3,9 +3,12 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, Platform, KeyboardAvoidingView, ActivityIndicator
+  Alert, Platform, KeyboardAvoidingView, ActivityIndicator, StatusBar
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Video } from 'expo-av';
+import { BlurView } from 'expo-blur';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const API_BASE = Platform.select({
   ios: "http://localhost:8000",
@@ -14,19 +17,23 @@ const API_BASE = Platform.select({
 });
 
 export default function LoginScreen() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter both email and password.');
+      return;
+    }
     if (loading) return;
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -41,111 +48,132 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Login</Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <Video
+        source={require('../assets/videos/background.mp4')}
+        style={StyleSheet.absoluteFill}
+        isMuted
+        shouldPlay
+        isLooping
+        resizeMode="cover"
+      />
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardView}>
+        <BlurView intensity={50} tint="dark" style={styles.card}>
+          <Text style={styles.title}>Sign In</Text>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Username:</Text>
-          <TextInput
-            style={styles.input}
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-            placeholderTextColor="#555"
-          />
-        </View>
+          <View style={styles.inputContainer}>
+            <MaterialCommunityIcons name="email-outline" size={20} color="#ccc" style={styles.icon} />
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Enter your email"
+              placeholderTextColor="#999"
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+          </View>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Password:</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholderTextColor="#555"
-          />
-        </View>
+          <View style={styles.inputContainer}>
+            <MaterialCommunityIcons name="lock-outline" size={20} color="#ccc" style={styles.icon} />
+            <TextInput
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Enter your password"
+              placeholderTextColor="#999"
+              secureTextEntry
+            />
+          </View>
 
-        <TouchableOpacity style={styles.buttonPrimary} onPress={handleLogin} disabled={loading}>
-          {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonTextPrimary}>Login</Text>}
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.buttonPrimary} onPress={handleLogin} disabled={loading}>
+            {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.buttonTextPrimary}>Sign In</Text>}
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.buttonSecondary} onPress={() => router.push('/signup')} disabled={loading}>
-          <Text style={styles.buttonTextSecondary}>Create an account</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Don't have an account? </Text>
+            <TouchableOpacity onPress={() => router.push('/signup')} disabled={loading}>
+              <Text style={styles.linkText}>Sign Up</Text>
+            </TouchableOpacity>
+          </View>
+        </BlurView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
+    backgroundColor: '#000',
+  },
+  keyboardView: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0B101B',
   },
   card: {
-    backgroundColor: '#161D2B', 
-    borderRadius: 12,
-    padding: 30,
     width: '90%',
-    maxWidth: 360,
+    maxWidth: 400,
+    borderRadius: 20,
+    padding: 25,
+    overflow: 'hidden', // Important for BlurView border radius
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#FFFFFF',
     marginBottom: 30,
     textAlign: 'center',
   },
   inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     width: '100%',
-    marginBottom: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 12,
+    marginBottom: 15,
+    paddingHorizontal: 15,
   },
-  label: {
-    color: '#AAB3C4',
-    marginBottom: 8,
-    fontSize: 14,
+  icon: {
+    marginRight: 10,
   },
   input: {
+    flex: 1,
     height: 50,
-    borderColor: '#344054',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 15,
     color: '#FFFFFF',
-    backgroundColor: '#0B101B',
     fontSize: 16,
   },
   buttonPrimary: {
-    backgroundColor: '#4A80F0',
-    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
     height: 50,
-    marginTop: 10,
+    marginTop: 20,
   },
   buttonTextPrimary: {
-    color: '#FFFFFF',
+    color: '#000000',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  buttonSecondary: {
-    borderColor: '#4A80F0',
-    borderWidth: 1,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    height: 50,
-    marginTop: 15,
+  footer: {
+    flexDirection: 'row',
+    marginTop: 25,
   },
-  buttonTextSecondary: {
-    color: '#4A80F0',
-    fontSize: 16,
+  footerText: {
+    color: '#BBBBBB',
+    fontSize: 14,
+  },
+  linkText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: 'bold',
   },
 });

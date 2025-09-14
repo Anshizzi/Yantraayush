@@ -1,12 +1,20 @@
+// In frontend/app/signup.tsx
+
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, Platform, KeyboardAvoidingView, ActivityIndicator
+  Alert, Platform, KeyboardAvoidingView, ActivityIndicator, StatusBar
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Video } from 'expo-av';
+import { BlurView } from 'expo-blur';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-//computer's current IP address
-const API_BASE = "http://192.168.25.1:8000";
+const API_BASE = Platform.select({
+  ios: "http://localhost:8000",
+  android: "http://10.0.2.2:8000",
+  default: "http://localhost:8000",
+});
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState('');
@@ -15,6 +23,10 @@ export default function SignUpScreen() {
   const router = useRouter();
 
   const handleSignUp = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please fill in all fields.');
+      return;
+    }
     if (loading) return;
     setLoading(true);
     try {
@@ -25,139 +37,146 @@ export default function SignUpScreen() {
       });
       
       const data = await response.json();
-
       if (!response.ok) {
-        let errorMessage = 'Sign-up failed.'; // Default message
-        
-        if (response.status === 422 && data.detail && Array.isArray(data.detail)) {
-          const firstError = data.detail[0];
-          errorMessage = `Invalid ${firstError.loc[1]}: ${firstError.msg}`;
-        } 
-        else if (data.detail) {
-          errorMessage = data.detail;
-        }
-        
-        throw new Error(errorMessage);
+        throw new Error(data.detail || 'Sign-up failed');
       }
 
-      Alert.alert('Success', 'Account created successfully! Please log in.');
-      router.replace('/login');
+      Alert.alert('Success', 'Account created! Please sign in.');
+      router.back();
     } catch (error: any) {
-      Alert.alert('Sign-Up Error', error.message);
+      Alert.alert('Sign-Up Error', error.message || 'Could not create account.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Create Account</Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <Video
+        source={require('../assets/videos/background.mp4')}
+        style={StyleSheet.absoluteFill}
+        isMuted
+        shouldPlay
+        isLooping
+        resizeMode="cover"
+      />
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardView}>
+        <BlurView intensity={50} tint="dark" style={styles.card}>
+          <Text style={styles.title}>Create Account</Text>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Email:</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            placeholder="Enter your email"
-            placeholderTextColor="#555"
-          />
-        </View>
+          <View style={styles.inputContainer}>
+            <MaterialCommunityIcons name="email-outline" size={20} color="#ccc" style={styles.icon} />
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Enter your email"
+              placeholderTextColor="#999"
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+          </View>
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Password:</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholder="Enter your password"
-            placeholderTextColor="#555"
-          />
-        </View>
+          <View style={styles.inputContainer}>
+            <MaterialCommunityIcons name="lock-outline" size={20} color="#ccc" style={styles.icon} />
+            <TextInput
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Create a password"
+              placeholderTextColor="#999"
+              secureTextEntry
+            />
+          </View>
 
-        <TouchableOpacity style={styles.buttonPrimary} onPress={handleSignUp} disabled={loading}>
-          {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonTextPrimary}>Sign Up</Text>}
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.buttonPrimary} onPress={handleSignUp} disabled={loading}>
+            {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.buttonTextPrimary}>Sign Up</Text>}
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.buttonSecondary} onPress={() => router.back()} disabled={loading}>
-          <Text style={styles.buttonTextSecondary}>Back to Login</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Already have an account? </Text>
+            <TouchableOpacity onPress={() => router.back()} disabled={loading}>
+              <Text style={styles.linkText}>Sign In</Text>
+            </TouchableOpacity>
+          </View>
+        </BlurView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
+    backgroundColor: '#000',
+  },
+  keyboardView: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0B101B',
   },
   card: {
-    backgroundColor: '#161D2B',
-    borderRadius: 12,
-    padding: 30,
     width: '90%',
-    maxWidth: 360,
+    maxWidth: 400,
+    borderRadius: 20,
+    padding: 25,
+    overflow: 'hidden', // Important for BlurView border radius
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#FFFFFF',
     marginBottom: 30,
     textAlign: 'center',
   },
   inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     width: '100%',
-    marginBottom: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 12,
+    marginBottom: 15,
+    paddingHorizontal: 15,
   },
-  label: {
-    color: '#AAB3C4',
-    marginBottom: 8,
-    fontSize: 14,
+  icon: {
+    marginRight: 10,
   },
   input: {
+    flex: 1,
     height: 50,
-    borderColor: '#344054',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 15,
     color: '#FFFFFF',
-    backgroundColor: '#0B101B',
     fontSize: 16,
   },
   buttonPrimary: {
-    backgroundColor: '#4A80F0',
-    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
     height: 50,
-    marginTop: 10,
+    marginTop: 20,
   },
   buttonTextPrimary: {
-    color: '#FFFFFF',
+    color: '#000000',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  buttonSecondary: {
-    borderColor: '#4A80F0',
-    borderWidth: 1,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    height: 50,
-    marginTop: 15,
+  footer: {
+    flexDirection: 'row',
+    marginTop: 25,
   },
-  buttonTextSecondary: {
-    color: '#4A80F0',
-    fontSize: 16,
+  footerText: {
+    color: '#BBBBBB',
+    fontSize: 14,
+  },
+  linkText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: 'bold',
   },
 });
