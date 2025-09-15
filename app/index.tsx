@@ -23,7 +23,6 @@ export default function LoginScreen() {
   const router = useRouter();
 
   const handleLogin = async () => {
-    // ... (Your existing login logic remains unchanged)
     if (!email || !password) {
       Alert.alert('Error', 'Please enter both email and password.');
       return;
@@ -62,11 +61,9 @@ export default function LoginScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardView}>
         <BlurView intensity={50} tint="dark" style={styles.card}>
 
-          {/* --- NEW: Logo and Brand Name --- */}
           <View style={styles.logoPlaceholder} />
           <Text style={styles.brandName}>YANTAAYUSH</Text>
           <Text style={styles.subtitle}>Sign in to your account</Text>
-          {/* --- End of new section --- */}
 
           <View style={styles.inputContainer}>
             <MaterialCommunityIcons name="email-outline" size={20} color="#ccc" style={styles.icon} />
@@ -110,28 +107,19 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    width: '100%',
-    backgroundColor: '#000',
-  },
-  keyboardView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  container: { flex: 1, width: '100%', backgroundColor: '#000' },
+  keyboardView: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   card: {
     width: '90%',
     maxWidth: 400,
     borderRadius: 20,
     paddingHorizontal: 25,
-    paddingVertical: 35, // Increased vertical padding
+    paddingVertical: 35,
     overflow: 'hidden',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  // --- NEW STYLES ---
   logoPlaceholder: {
     width: 60,
     height: 60,
@@ -139,19 +127,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     marginBottom: 15,
   },
-  brandName: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#BBBBBB',
-    marginBottom: 30, // Space before the first input field
-    textAlign: 'center',
-  },
-  // --- End of new styles ---
+  brandName: { fontSize: 32, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center' },
+  subtitle: { fontSize: 16, color: '#BBBBBB', marginBottom: 30, textAlign: 'center' },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -161,15 +138,8 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     paddingHorizontal: 15,
   },
-  icon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    height: 50,
-    color: '#FFFFFF',
-    fontSize: 16,
-  },
+  icon: { marginRight: 10 },
+  input: { flex: 1, height: 50, color: '#FFFFFF', fontSize: 16 },
   buttonPrimary: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
@@ -179,22 +149,8 @@ const styles = StyleSheet.create({
     height: 50,
     marginTop: 20,
   },
-  buttonTextPrimary: {
-    color: '#000000',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  footer: {
-    flexDirection: 'row',
-    marginTop: 25,
-  },
-  footerText: {
-    color: '#BBBBBB',
-    fontSize: 14,
-  },
-  linkText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
+  buttonTextPrimary: { color: '#000000', fontSize: 16, fontWeight: 'bold' },
+  footer: { flexDirection: 'row', marginTop: 25 },
+  footerText: { color: '#BBBBBB', fontSize: 14 },
+  linkText: { color: '#FFFFFF', fontSize: 14, fontWeight: 'bold' },
 });
