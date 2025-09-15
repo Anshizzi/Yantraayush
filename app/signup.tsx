@@ -23,6 +23,7 @@ export default function SignUpScreen() {
   const router = useRouter();
 
   const handleSignUp = async () => {
+    // ... (Your existing sign-up logic remains unchanged)
     if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields.');
       return;
@@ -63,8 +64,13 @@ export default function SignUpScreen() {
       />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardView}>
         <BlurView intensity={50} tint="dark" style={styles.card}>
-          <Text style={styles.title}>Create Account</Text>
 
+          {/* --- NEW: Logo and Brand Name --- */}
+          <View style={styles.logoPlaceholder} />
+          <Text style={styles.brandName}>YANTAAYUSH</Text>
+          <Text style={styles.subtitle}>Create a new account</Text>
+          {/* --- End of new section --- */}
+          
           <View style={styles.inputContainer}>
             <MaterialCommunityIcons name="email-outline" size={20} color="#ccc" style={styles.icon} />
             <TextInput
@@ -121,19 +127,34 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 400,
     borderRadius: 20,
-    padding: 25,
-    overflow: 'hidden', // Important for BlurView border radius
+    paddingHorizontal: 25,
+    paddingVertical: 35, // Increased vertical padding
+    overflow: 'hidden',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  title: {
+  // --- NEW STYLES ---
+  logoPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 15,
+  },
+  brandName: {
     fontSize: 32,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 30,
     textAlign: 'center',
   },
+  subtitle: {
+    fontSize: 16,
+    color: '#BBBBBB',
+    marginBottom: 30, // Space before the first input field
+    textAlign: 'center',
+  },
+  // --- End of new styles ---
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
