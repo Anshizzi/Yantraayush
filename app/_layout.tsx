@@ -9,8 +9,8 @@ export default function RootLayout() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="signup" options={{
         title: "Create Account",
-        headerStyle: { backgroundColor: '#101010' }, // Dark header
-        headerTintColor: '#fff', // White title
+        headerStyle: { backgroundColor: '#101010' }, 
+        headerTintColor: '#fff',
       }} />
       <Stack.Screen name="+not-found" />
     </Stack>

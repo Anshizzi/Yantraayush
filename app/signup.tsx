@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  // --- NEW STYLES ---
+  
   logoPlaceholder: {
     width: 60,
     height: 60,
@@ -151,10 +151,10 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#BBBBBB',
-    marginBottom: 30, // Space before the first input field
+    marginBottom: 30,
     textAlign: 'center',
   },
-  // --- End of new styles ---
+  
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',

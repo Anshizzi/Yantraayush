@@ -27,7 +27,7 @@ export default function SignUpScreen() {
       if (!response.ok) throw new Error(data.detail || 'Sign-up failed');
 
       Alert.alert('Success', 'Account created! Please log in.');
-      router.back(); // Go back to the login screen
+      router.back(); 
     } catch (error: any) {
       Alert.alert('Sign-Up Error', error.message || 'Could not create account.');
     }

@@ -7,12 +7,12 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false, // Hide the default header for all tabs
-        tabBarActiveTintColor: '#00FFC2', // Active icon color
-        tabBarInactiveTintColor: '#888', // Inactive icon color
+        headerShown: false, 
+        tabBarActiveTintColor: '#00FFC2', 
+        tabBarInactiveTintColor: '#888', 
         tabBarStyle: {
-          backgroundColor: '#101010', // Dark background for the tab bar
-          borderTopWidth: 0, // Remove the top border line
+          backgroundColor: '#101010', 
+          borderTopWidth: 0,
         },
       }}
     >
