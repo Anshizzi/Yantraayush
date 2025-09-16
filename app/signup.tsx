@@ -23,7 +23,6 @@ export default function SignUpScreen() {
   const router = useRouter();
 
   const handleSignUp = async () => {
-    // ... (Your existing sign-up logic remains unchanged)
     if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields.');
       return;
@@ -65,11 +64,10 @@ export default function SignUpScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardView}>
         <BlurView intensity={50} tint="dark" style={styles.card}>
 
-          {/* --- NEW: Logo and Brand Name --- */}
           <View style={styles.logoPlaceholder} />
           <Text style={styles.brandName}>YANTAAYUSH</Text>
           <Text style={styles.subtitle}>Create a new account</Text>
-          {/* --- End of new section --- */}
+         
           
           <View style={styles.inputContainer}>
             <MaterialCommunityIcons name="email-outline" size={20} color="#ccc" style={styles.icon} />
@@ -128,7 +126,7 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     borderRadius: 20,
     paddingHorizontal: 25,
-    paddingVertical: 35, // Increased vertical padding
+    paddingVertical: 35,
     overflow: 'hidden',
     alignItems: 'center',
     borderWidth: 1,
