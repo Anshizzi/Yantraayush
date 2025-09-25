@@ -1,11 +1,22 @@
+// In frontend/app/(tabs)/index.tsx
+
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
-  FlatList, TextInput, Alert, StatusBar, Modal, Dimensions
+  FlatList, TextInput, Alert, StatusBar, Modal, Dimensions, Platform
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
+import { useRouter } from 'expo-router';
 
-// --- Time Display Component ---
+// --- API Base URL ---
+const API_BASE = Platform.select({
+  ios: "http://localhost:8000",
+  android: "http://10.0.2.2:8000",
+  default: "http://localhost:8000",
+});
+
+// --- Time Display Component (no changes) ---
 const TimezoneDisplay = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -28,7 +39,7 @@ const TimezoneDisplay = () => {
 };
 
 interface Sensor {
-  id: string;
+  id: string; // The database will provide this
   name: string;
   description: string;
   pins: string[];
@@ -48,6 +59,45 @@ export default function HomeScreen() {
   const [selectedPins, setSelectedPins] = useState<string[]>([]);
   
   const pinOptions = ['V', 'I', 'R'];
+  const router = useRouter();
+
+  // --- FETCH SENSORS FROM BACKEND ---
+  useEffect(() => {
+    const fetchSensors = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+          // If no token, user is not logged in, redirect
+          router.replace('/');
+          return;
+        }
+
+        const response = await fetch(`${API_BASE}/sensors/`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.status === 401) {
+            // Token is invalid or expired
+            await AsyncStorage.removeItem('token');
+            router.replace('/');
+            return;
+        }
+
+        if (!response.ok) throw new Error('Failed to fetch sensors');
+        
+        const data = await response.json();
+        setSensors(data);
+      } catch (error) {
+        console.error("Fetch sensors error:", error);
+        Alert.alert('Error', 'Could not load sensor data.');
+      }
+    };
+    fetchSensors();
+  }, []);
+
 
   const handlePinSelect = (pin: string) => {
     setSelectedPins(prev => 
@@ -62,21 +112,42 @@ export default function HomeScreen() {
     setModalVisible(true);
   };
 
-  const handleSaveSensor = () => {
+  // --- SAVE SENSOR TO BACKEND ---
+  const handleSaveSensor = async () => {
     if (!newName.trim()) {
       Alert.alert('Validation Error', 'Sensor name is required.');
       return;
     }
-    const newSensor: Sensor = {
-      id: Date.now().toString(),
-      name: newName,
-      description: newDescription,
-      pins: selectedPins,
-    };
-    setSensors(prev => [...prev, newSensor]);
-    setModalVisible(false);
+    try {
+        const token = await AsyncStorage.getItem('token');
+        const newSensorData = {
+            name: newName,
+            description: newDescription,
+            pins: selectedPins,
+        };
+
+        const response = await fetch(`${API_BASE}/sensors/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(newSensorData)
+        });
+
+        if (!response.ok) throw new Error('Failed to save sensor');
+
+        const savedSensor = await response.json();
+        setSensors(prev => [...prev, savedSensor]); // Add new sensor from response to state
+        setModalVisible(false);
+
+    } catch (error) {
+        console.error("Save sensor error:", error);
+        Alert.alert('Error', 'Could not save the sensor.');
+    }
   };
 
+  // --- DELETE SENSOR FROM BACKEND ---
   const handleDeleteSensor = (id: string) => {
     Alert.alert(
       "Delete Sensor",
@@ -86,8 +157,23 @@ export default function HomeScreen() {
         { 
           text: "Delete", 
           style: "destructive", 
-          onPress: () => {
-            setSensors(prevSensors => prevSensors.filter(sensor => sensor.id !== id));
+          onPress: async () => {
+            try {
+                const token = await AsyncStorage.getItem('token');
+                const response = await fetch(`${API_BASE}/sensors/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Failed to delete sensor');
+                
+                setSensors(prevSensors => prevSensors.filter(sensor => sensor.id !== id));
+            } catch (error) {
+                console.error("Delete sensor error:", error);
+                Alert.alert('Error', 'Could not delete the sensor.');
+            }
           } 
         }
       ]
@@ -120,7 +206,7 @@ export default function HomeScreen() {
       <FlatList
         data={sensors}
         renderItem={renderSensor}
-        keyExtractor={item => item.id}
+        keyExtractor={item => item.id.toString()} // Ensure key is a string
         numColumns={4}
         contentContainerStyle={styles.list}
         columnWrapperStyle={{ gap: gap }}
@@ -172,6 +258,7 @@ export default function HomeScreen() {
   );
 }
 
+// Styles remain the same
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#000000' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10, },

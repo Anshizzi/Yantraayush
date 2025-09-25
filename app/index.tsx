@@ -1,5 +1,4 @@
 // In frontend/app/index.tsx
-
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
@@ -9,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { Video } from 'expo-av';
 import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
 
 const API_BASE = Platform.select({
   ios: "http://localhost:8000",
@@ -39,6 +39,10 @@ export default function LoginScreen() {
       if (!response.ok) {
         throw new Error(data.detail || 'Login failed');
       }
+      
+      // *** SAVE THE TOKEN ***
+      await AsyncStorage.setItem('token', data.access_token);
+      
       router.replace('/(tabs)/');
     } catch (error: any) {
       Alert.alert('Login Error', error.message || 'Could not connect to the server.');
@@ -106,6 +110,7 @@ export default function LoginScreen() {
   );
 }
 
+// Styles remain the same
 const styles = StyleSheet.create({
   container: { flex: 1, width: '100%', backgroundColor: '#000' },
   keyboardView: { flex: 1, justifyContent: 'center', alignItems: 'center' },
