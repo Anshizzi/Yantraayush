@@ -1,4 +1,3 @@
-// In frontend/app/index.tsx
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
@@ -8,12 +7,12 @@ import { useRouter } from 'expo-router';
 import { Video } from 'expo-av';
 import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE = Platform.select({
-  ios: "http://localhost:8000",
-  android: "http://10.0.2.2:8000",
-  default: "http://localhost:8000",
+  ios: 'http://localhost:8000',
+  android: 'http://10.0.2.2:8000',
+  default: 'http://localhost:8000',
 });
 
 export default function LoginScreen() {
@@ -36,13 +35,9 @@ export default function LoginScreen() {
         body: JSON.stringify({ email, password }),
       });
       const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.detail || 'Login failed');
-      }
-      
-      // *** SAVE THE TOKEN ***
+      if (!response.ok) throw new Error(data.detail || 'Login failed');
+
       await AsyncStorage.setItem('token', data.access_token);
-      
       router.replace('/(tabs)/');
     } catch (error: any) {
       Alert.alert('Login Error', error.message || 'Could not connect to the server.');
@@ -57,14 +52,16 @@ export default function LoginScreen() {
       <Video
         source={require('../assets/videos/background.mp4')}
         style={StyleSheet.absoluteFill}
-        isMuted
         shouldPlay
         isLooping
+        isMuted
         resizeMode="cover"
+        // For Web reliability with bundled assets
+        useNativeControls={false}
+        posterSource={undefined}
       />
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardView}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
         <BlurView intensity={50} tint="dark" style={styles.card}>
-
           <View style={styles.logoPlaceholder} />
           <Text style={styles.brandName}>YANTAAYUSH</Text>
           <Text style={styles.subtitle}>Sign in to your account</Text>
@@ -110,49 +107,25 @@ export default function LoginScreen() {
   );
 }
 
-// Styles remain the same
 const styles = StyleSheet.create({
   container: { flex: 1, width: '100%', backgroundColor: '#000' },
   keyboardView: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   card: {
-    width: '90%',
-    maxWidth: 400,
-    borderRadius: 20,
-    paddingHorizontal: 25,
-    paddingVertical: 35,
-    overflow: 'hidden',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    width: '90%', maxWidth: 400, borderRadius: 20, paddingHorizontal: 25, paddingVertical: 35,
+    overflow: 'hidden', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  logoPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 15,
-  },
+  logoPlaceholder: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#FFFFFF', marginBottom: 15 },
   brandName: { fontSize: 32, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center' },
   subtitle: { fontSize: 16, color: '#BBBBBB', marginBottom: 30, textAlign: 'center' },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderRadius: 12,
-    marginBottom: 15,
-    paddingHorizontal: 15,
+    flexDirection: 'row', alignItems: 'center', width: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', borderRadius: 12, marginBottom: 15, paddingHorizontal: 15,
   },
   icon: { marginRight: 10 },
   input: { flex: 1, height: 50, color: '#FFFFFF', fontSize: 16 },
   buttonPrimary: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    height: 50,
-    marginTop: 20,
+    backgroundColor: '#FFFFFF', borderRadius: 12, justifyContent: 'center', alignItems: 'center',
+    width: '100%', height: 50, marginTop: 20,
   },
   buttonTextPrimary: { color: '#000000', fontSize: 16, fontWeight: 'bold' },
   footer: { flexDirection: 'row', marginTop: 25 },

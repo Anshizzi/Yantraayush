@@ -1,5 +1,3 @@
-// In frontend/app/signup.tsx
-
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
@@ -11,10 +9,13 @@ import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const API_BASE = Platform.select({
-  ios: "http://localhost:8000",
-  android: "http://10.0.2.2:8000",
-  default: "http://localhost:8000",
+  ios: 'http://localhost:8000',
+  android: 'http://10.0.2.2:8000',
+  default: 'http://localhost:8000',
 });
+
+// Change this to '/register' if the backend route has no '/auth' prefix
+const SIGNUP_PATH = '/auth/register';
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState('');
@@ -28,23 +29,30 @@ export default function SignUpScreen() {
       return;
     }
     if (loading) return;
+
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/register`, {
+      const res = await fetch(`${API_BASE}${SIGNUP_PATH}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-      
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.detail || 'Sign-up failed');
+
+      // Safely parse JSON (backend might return non-JSON on errors)
+      let data: any = null;
+      try { data = await res.json(); } catch {}
+
+      if (!res.ok) {
+        const msg =
+          (data && (data.detail || data.message || data.error)) ||
+          `Sign-up failed (${res.status})`;
+        throw new Error(msg);
       }
 
       Alert.alert('Success', 'Account created! Please sign in.');
       router.back();
     } catch (error: any) {
-      Alert.alert('Sign-Up Error', error.message || 'Could not create account.');
+      Alert.alert('Sign-Up Error', error?.message || 'Could not create account.');
     } finally {
       setLoading(false);
     }
@@ -56,19 +64,19 @@ export default function SignUpScreen() {
       <Video
         source={require('../assets/videos/background.mp4')}
         style={StyleSheet.absoluteFill}
-        isMuted
         shouldPlay
         isLooping
+        isMuted
         resizeMode="cover"
+        useNativeControls={false}
+        posterSource={undefined}
       />
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardView}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
         <BlurView intensity={50} tint="dark" style={styles.card}>
-
           <View style={styles.logoPlaceholder} />
           <Text style={styles.brandName}>YANTAAYUSH</Text>
           <Text style={styles.subtitle}>Create a new account</Text>
-         
-          
+
           <View style={styles.inputContainer}>
             <MaterialCommunityIcons name="email-outline" size={20} color="#ccc" style={styles.icon} />
             <TextInput
@@ -79,6 +87,7 @@ export default function SignUpScreen() {
               placeholderTextColor="#999"
               autoCapitalize="none"
               keyboardType="email-address"
+              editable={!loading}
             />
           </View>
 
@@ -91,6 +100,7 @@ export default function SignUpScreen() {
               placeholder="Create a password"
               placeholderTextColor="#999"
               secureTextEntry
+              editable={!loading}
             />
           </View>
 
@@ -111,91 +121,27 @@ export default function SignUpScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    width: '100%',
-    backgroundColor: '#000',
-  },
-  keyboardView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  container: { flex: 1, width: '100%', backgroundColor: '#000' },
+  keyboardView: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   card: {
-    width: '90%',
-    maxWidth: 400,
-    borderRadius: 20,
-    paddingHorizontal: 25,
-    paddingVertical: 35,
-    overflow: 'hidden',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    width: '90%', maxWidth: 400, borderRadius: 20, paddingHorizontal: 25, paddingVertical: 35,
+    overflow: 'hidden', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  
-  logoPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 15,
-  },
-  brandName: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#BBBBBB',
-    marginBottom: 30,
-    textAlign: 'center',
-  },
-  
+  logoPlaceholder: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#FFFFFF', marginBottom: 15 },
+  brandName: { fontSize: 32, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center' },
+  subtitle: { fontSize: 16, color: '#BBBBBB', marginBottom: 30, textAlign: 'center' },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderRadius: 12,
-    marginBottom: 15,
-    paddingHorizontal: 15,
+    flexDirection: 'row', alignItems: 'center', width: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', borderRadius: 12, marginBottom: 15, paddingHorizontal: 15,
   },
-  icon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    height: 50,
-    color: '#FFFFFF',
-    fontSize: 16,
-  },
+  icon: { marginRight: 10 },
+  input: { flex: 1, height: 50, color: '#FFFFFF', fontSize: 16 },
   buttonPrimary: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    height: 50,
-    marginTop: 20,
+    backgroundColor: '#FFFFFF', borderRadius: 12, justifyContent: 'center', alignItems: 'center',
+    width: '100%', height: 50, marginTop: 20,
   },
-  buttonTextPrimary: {
-    color: '#000000',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  footer: {
-    flexDirection: 'row',
-    marginTop: 25,
-  },
-  footerText: {
-    color: '#BBBBBB',
-    fontSize: 14,
-  },
-  linkText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
+  buttonTextPrimary: { color: '#000000', fontSize: 16, fontWeight: 'bold' },
+  footer: { flexDirection: 'row', marginTop: 25 },
+  footerText: { color: '#BBBBBB', fontSize: 14 },
+  linkText: { color: '#FFFFFF', fontSize: 14, fontWeight: 'bold' },
 });
