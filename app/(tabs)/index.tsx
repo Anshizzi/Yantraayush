@@ -1,35 +1,27 @@
 // In frontend/app/(tabs)/index.tsx
-
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
   FlatList, TextInput, Alert, StatusBar, Modal, Dimensions, Platform
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 
-// --- API Base URL ---
 const API_BASE = Platform.select({
   ios: "http://localhost:8000",
   android: "http://10.0.2.2:8000",
   default: "http://localhost:8000",
 });
 
-// --- Time Display Component (no changes) ---
 const TimezoneDisplay = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
-
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-
   const formattedTime = currentTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
   return (
     <View style={styles.timeContainer}>
       <Text style={styles.timeText}>{formattedTime}</Text>
@@ -38,8 +30,9 @@ const TimezoneDisplay = () => {
   );
 };
 
+// This now matches the schema for a sensor object inside the database JSON
 interface Sensor {
-  id: string; // The database will provide this
+  id: string; 
   name: string;
   description: string;
   pins: string[];
@@ -61,33 +54,24 @@ export default function HomeScreen() {
   const pinOptions = ['V', 'I', 'R'];
   const router = useRouter();
 
-  // --- FETCH SENSORS FROM BACKEND ---
   useEffect(() => {
     const fetchSensors = async () => {
       try {
         const token = await AsyncStorage.getItem('token');
         if (!token) {
-          // If no token, user is not logged in, redirect
           router.replace('/');
           return;
         }
-
         const response = await fetch(`${API_BASE}/sensors/`, {
           method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
-
         if (response.status === 401) {
-            // Token is invalid or expired
-            await AsyncStorage.removeItem('token');
-            router.replace('/');
-            return;
+          await AsyncStorage.removeItem('token');
+          router.replace('/');
+          return;
         }
-
         if (!response.ok) throw new Error('Failed to fetch sensors');
-        
         const data = await response.json();
         setSensors(data);
       } catch (error) {
@@ -97,7 +81,6 @@ export default function HomeScreen() {
     };
     fetchSensors();
   }, []);
-
 
   const handlePinSelect = (pin: string) => {
     setSelectedPins(prev => 
@@ -112,7 +95,6 @@ export default function HomeScreen() {
     setModalVisible(true);
   };
 
-  // --- SAVE SENSOR TO BACKEND ---
   const handleSaveSensor = async () => {
     if (!newName.trim()) {
       Alert.alert('Validation Error', 'Sensor name is required.');
@@ -125,7 +107,6 @@ export default function HomeScreen() {
             description: newDescription,
             pins: selectedPins,
         };
-
         const response = await fetch(`${API_BASE}/sensors/`, {
             method: 'POST',
             headers: {
@@ -134,24 +115,22 @@ export default function HomeScreen() {
             },
             body: JSON.stringify(newSensorData)
         });
-
         if (!response.ok) throw new Error('Failed to save sensor');
-
-        const savedSensor = await response.json();
-        setSensors(prev => [...prev, savedSensor]); // Add new sensor from response to state
+        
+        // *** FIX: backend returns full updated list of sensors ***
+        const updatedSensorsList = await response.json();
+        setSensors(updatedSensorsList); 
+        
         setModalVisible(false);
-
     } catch (error) {
         console.error("Save sensor error:", error);
         Alert.alert('Error', 'Could not save the sensor.');
     }
   };
 
-  // --- DELETE SENSOR FROM BACKEND ---
   const handleDeleteSensor = (id: string) => {
     Alert.alert(
-      "Delete Sensor",
-      "Are you sure you want to delete this sensor?",
+      "Delete Sensor", "Are you sure you want to delete this sensor?",
       [
         { text: "Cancel", style: "cancel" },
         { 
@@ -162,13 +141,9 @@ export default function HomeScreen() {
                 const token = await AsyncStorage.getItem('token');
                 const response = await fetch(`${API_BASE}/sensors/${id}`, {
                     method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
-                
                 if (!response.ok) throw new Error('Failed to delete sensor');
-                
                 setSensors(prevSensors => prevSensors.filter(sensor => sensor.id !== id));
             } catch (error) {
                 console.error("Delete sensor error:", error);
@@ -202,11 +177,10 @@ export default function HomeScreen() {
         <Text style={styles.title}>My Sensors</Text>
         <TimezoneDisplay />
       </View>
-
       <FlatList
         data={sensors}
         renderItem={renderSensor}
-        keyExtractor={item => item.id.toString()} // Ensure key is a string
+        keyExtractor={item => item.id}
         numColumns={4}
         contentContainerStyle={styles.list}
         columnWrapperStyle={{ gap: gap }}
@@ -218,7 +192,6 @@ export default function HomeScreen() {
           </View>
         }
       />
-      
       <Modal
         animationType="fade"
         transparent={true}
@@ -227,7 +200,6 @@ export default function HomeScreen() {
       >
         <View style={styles.modalBackdrop}>
           <View style={styles.modalView}>
-            {/* Modal content remains the same */}
             <Text style={styles.modalTitle}>Add New Sensor</Text>
             <TextInput style={styles.input} placeholder="Sensor Name (e.g., Temp-01)" placeholderTextColor="#666" value={newName} onChangeText={setNewName} />
             <TextInput style={[styles.input, styles.descriptionInput]} placeholder="Description" placeholderTextColor="#666" value={newDescription} onChangeText={setNewDescription} multiline />
@@ -250,7 +222,6 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
-
       <TouchableOpacity style={styles.fab} onPress={openAddSensorModal}>
         <MaterialCommunityIcons name="plus" size={30} color="#000" />
       </TouchableOpacity>
@@ -258,7 +229,6 @@ export default function HomeScreen() {
   );
 }
 
-// Styles remain the same
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#000000' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10, },
@@ -278,10 +248,7 @@ const styles = StyleSheet.create({
       paddingHorizontal: 15,
       marginBottom: 10,
     },
-    sensorInfo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
+    sensorInfo: { flexDirection: 'row', alignItems: 'center' },
     sensorCardTitle: { color: '#fff', fontWeight: 'bold', fontSize: 14, },
     sensorCardPins: { color: '#00FFC2', fontSize: 12, marginTop: 2, },
     emptyContainer: { alignItems: 'center', paddingTop: '20%' },
@@ -289,14 +256,7 @@ const styles = StyleSheet.create({
     emptySubText: { color: '#666', fontSize: 14, marginTop: 5 },
     fab: { position: 'absolute', width: 60, height: 60, borderRadius: 30, backgroundColor: '#00FFC2', justifyContent: 'center', alignItems: 'center', right: 20, bottom: 30, elevation: 8, },
     modalBackdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.7)', },
-    modalView: {
-      width: '90%',
-      maxWidth: 500,
-      backgroundColor: '#1E1E1E',
-      borderRadius: 20,
-      padding: 25,
-      alignItems: 'stretch',
-    },
+    modalView: { width: '90%', maxWidth: 500, backgroundColor: '#1E1E1E', borderRadius: 20, padding: 25, alignItems: 'stretch', },
     modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff', marginBottom: 20, textAlign: 'center', },
     input: { backgroundColor: '#2b2b2b', color: '#fff', borderRadius: 10, padding: 15, marginBottom: 15, fontSize: 16, },
     descriptionInput: { height: 80, textAlignVertical: 'top' },
