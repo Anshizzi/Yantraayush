@@ -1,12 +1,15 @@
-// In frontend/app/(tabs)/index.tsx
-import React, { useState, useEffect } from 'react';
+// File: frontend/app/(tabs)/index.tsx
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
-  FlatList, TextInput, Alert, StatusBar, Modal, Dimensions, Platform
+  TextInput, Alert, StatusBar, Modal, Dimensions, Platform, ScrollView, ActivityIndicator // Added ActivityIndicator
 } from 'react-native';
+// Removed FlatList import, using DraggableFlatList now
+import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+// NOTE: Ensure GestureHandlerRootView wraps your app, typically in _layout.tsx
 
 const API_BASE = Platform.select({
   ios: "http://localhost:8000",
@@ -14,6 +17,23 @@ const API_BASE = Platform.select({
   default: "http://localhost:8000",
 });
 
+const AVAILABLE_PINS = Array.from({ length: 8 }, (_, i) => `P${i + 1}`);
+
+// --- Interfaces ---
+interface Floor {
+  id: string;
+  name: string;
+  pins: string[];
+}
+
+interface System {
+  id: string;
+  name: string;
+  description: string;
+  floors: Floor[];
+}
+
+// Timezone Display
 const TimezoneDisplay = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   useEffect(() => {
@@ -25,210 +45,549 @@ const TimezoneDisplay = () => {
   return (
     <View style={styles.timeContainer}>
       <Text style={styles.timeText}>{formattedTime}</Text>
-      <Text style={styles.timezoneText}>{timezone.split('/').pop()}</Text>
+      <Text style={styles.timezoneText}>{timezone.split('/').pop()?.replace('_', ' ')}</Text>
     </View>
   );
 };
 
-// This now matches the schema for a sensor object inside the database JSON
-interface Sensor {
-  id: string; 
-  name: string;
-  description: string;
-  pins: string[];
-}
-
-const { width } = Dimensions.get('window');
+// Layout Constants
+const { width: windowWidth } = Dimensions.get('window');
 const gap = 10;
-const totalGapSpace = (4 - 1) * gap;
-const cardWidth = (width - 40 - totalGapSpace) / 4;
+const numGridCols = 4;
+const totalGapSpace = (numGridCols - 1) * gap;
+const cardWidth = (windowWidth - 40 - totalGapSpace) / numGridCols;
 
 export default function HomeScreen() {
-  const [sensors, setSensors] = useState<Sensor[]>([]);
-  const [isModalVisible, setModalVisible] = useState(false);
-  
-  const [newName, setNewName] = useState('');
-  const [newDescription, setNewDescription] = useState('');
-  const [selectedPins, setSelectedPins] = useState<string[]>([]);
-  
-  const pinOptions = ['V', 'I', 'R'];
+  const [systems, setSystems] = useState<System[]>([]);
+  const [isAddSystemModalVisible, setAddSystemModalVisible] = useState(false);
+  const [isDetailModalVisible, setDetailModalVisible] = useState(false);
+  const [isAddFloorModalVisible, setAddFloorModalVisible] = useState(false);
+  const [isEditPinsModalVisible, setEditPinsModalVisible] = useState(false);
+  const [isSavingOrder, setIsSavingOrder] = useState(false); // Saving order state
+
+  const [selectedSystem, setSelectedSystem] = useState<System | null>(null);
+  const [tempPinAssignments, setTempPinAssignments] = useState<System | null>(null);
+
+  const [newSystemName, setNewSystemName] = useState('');
+  const [newSystemDescription, setNewSystemDescription] = useState('');
+  const [newFloorName, setNewFloorName] = useState('');
+
   const router = useRouter();
 
-  useEffect(() => {
-    const fetchSensors = async () => {
-      try {
-        const token = await AsyncStorage.getItem('token');
-        if (!token) {
-          router.replace('/');
-          return;
-        }
-        const response = await fetch(`${API_BASE}/sensors/`, {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (response.status === 401) {
-          await AsyncStorage.removeItem('token');
-          router.replace('/');
-          return;
-        }
-        if (!response.ok) throw new Error('Failed to fetch sensors');
-        const data = await response.json();
-        setSensors(data);
-      } catch (error) {
-        console.error("Fetch sensors error:", error);
-        Alert.alert('Error', 'Could not load sensor data.');
-      }
-    };
-    fetchSensors();
-  }, []);
+  // --- API Call Functions ---
 
-  const handlePinSelect = (pin: string) => {
-    setSelectedPins(prev => 
-      prev.includes(pin) ? prev.filter(p => p !== pin) : [...prev, pin]
-    );
-  };
-
-  const openAddSensorModal = () => {
-    setNewName('');
-    setNewDescription('');
-    setSelectedPins([]);
-    setModalVisible(true);
-  };
-
-  const handleSaveSensor = async () => {
-    if (!newName.trim()) {
-      Alert.alert('Validation Error', 'Sensor name is required.');
-      return;
+  const fetchSystems = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) { router.replace('/'); return; }
+      const response = await fetch(`${API_BASE}/systems/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.status === 401) { await AsyncStorage.removeItem('token'); router.replace('/'); return; }
+      if (!response.ok) throw new Error('Failed to fetch systems');
+      const data = await response.json();
+      setSystems(data);
+    } catch (error: any) {
+      console.error("Fetch systems error:", error);
+      Alert.alert('Error', 'Could not load system data.');
     }
+  }, [router]);
+
+  useEffect(() => {
+    fetchSystems();
+  }, [fetchSystems]);
+
+  const handleSaveSystem = async () => {
+    if (!newSystemName.trim()) { Alert.alert('Validation Error', 'System name is required.'); return; }
     try {
         const token = await AsyncStorage.getItem('token');
-        const newSensorData = {
-            name: newName,
-            description: newDescription,
-            pins: selectedPins,
-        };
-        const response = await fetch(`${API_BASE}/sensors/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(newSensorData)
+        const newSystemData = { name: newSystemName, description: newSystemDescription };
+        const response = await fetch(`${API_BASE}/systems/`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(newSystemData)
         });
-        if (!response.ok) throw new Error('Failed to save sensor');
-        
-        // *** FIX: backend returns full updated list of sensors ***
-        const updatedSensorsList = await response.json();
-        setSensors(updatedSensorsList); 
-        
-        setModalVisible(false);
-    } catch (error) {
-        console.error("Save sensor error:", error);
-        Alert.alert('Error', 'Could not save the sensor.');
+        if (!response.ok) throw new Error('Failed to save system');
+        const updatedSystemsList = await response.json();
+        setSystems(updatedSystemsList);
+        setAddSystemModalVisible(false);
+        setNewSystemName('');
+        setNewSystemDescription('');
+    } catch (error: any) {
+        console.error("Save system error:", error);
+        Alert.alert('Error', `Could not save system: ${error.message}`);
     }
   };
 
-  const handleDeleteSensor = (id: string) => {
-    Alert.alert(
-      "Delete Sensor", "Are you sure you want to delete this sensor?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive", 
-          onPress: async () => {
-            try {
-                const token = await AsyncStorage.getItem('token');
-                const response = await fetch(`${API_BASE}/sensors/${id}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!response.ok) throw new Error('Failed to delete sensor');
-                setSensors(prevSensors => prevSensors.filter(sensor => sensor.id !== id));
-            } catch (error) {
-                console.error("Delete sensor error:", error);
-                Alert.alert('Error', 'Could not delete the sensor.');
-            }
-          } 
-        }
-      ]
-    );
+  const handleDeleteSystem = async (id: string) => {
+    console.log(`[Delete System] Deleting system: ${id}`);
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/systems/${id}`, {
+        method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok || response.status === 204) {
+        setSystems(prev => prev.filter(sys => sys.id !== id));
+      } else {
+        const errorData = await response.text(); throw new Error(errorData || 'Failed to delete system');
+      }
+    } catch (error: any) {
+      console.error("[Delete System] Error:", error.message);
+      Alert.alert('Error', `Could not delete system: ${error.message}`);
+      await fetchSystems();
+    }
   };
 
-  const renderSensor = ({ item }: { item: Sensor }) => (
-    <View style={styles.sensorCard}>
-      <View style={styles.sensorInfo}>
-        <MaterialCommunityIcons name="lightning-bolt" size={24} color="#00FFC2" style={{marginRight: 8}}/>
-        <View>
-          <Text style={styles.sensorCardTitle}>{item.name}</Text>
-          <Text style={styles.sensorCardPins}>{item.pins.join(', ')}</Text>
+  const handleAddFloor = async () => {
+      // Frontend check for empty name and uniqueness
+      if (!newFloorName.trim() || !selectedSystem) {
+        Alert.alert('Error', 'Floor name cannot be empty.');
+        return;
+      }
+      const trimmedName = newFloorName.trim();
+      const nameExists = selectedSystem.floors.some(
+          floor => floor.name.toLowerCase() === trimmedName.toLowerCase()
+      );
+      if (nameExists) {
+          Alert.alert('Error', `A floor named '${trimmedName}' already exists in this system.`);
+          return;
+      }
+
+      try {
+          const token = await AsyncStorage.getItem('token');
+          // Backend will also check uniqueness, but frontend check improves UX
+          const response = await fetch(`${API_BASE}/systems/${selectedSystem.id}/floors`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ name: trimmedName }) // Send trimmed name
+          });
+          if (!response.ok) {
+             const err = await response.json(); throw new Error(err.detail || 'Failed to add floor');
+          }
+          const updatedSystemData = await response.json();
+
+          setSystems(prevSystems => prevSystems.map(sys =>
+              sys.id === updatedSystemData.id ? updatedSystemData : sys
+          ));
+          setSelectedSystem(updatedSystemData);
+
+          setAddFloorModalVisible(false);
+          setNewFloorName('');
+
+      } catch (error: any) {
+          console.error("Add floor error:", error);
+          Alert.alert('Error', `Could not add floor: ${error.message}`);
+      }
+    };
+
+
+  const handleUpdateSystemPinAssignments = async () => {
+    if (!tempPinAssignments) return;
+
+    const assignmentsPayload = {
+        assignments: tempPinAssignments.floors.map(floor => ({
+            floor_id: floor.id,
+            pins: floor.pins
+        }))
+    };
+
+    try {
+        const token = await AsyncStorage.getItem('token');
+        const response = await fetch(`${API_BASE}/systems/${tempPinAssignments.id}/pin_assignments`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(assignmentsPayload)
+        });
+         if (!response.ok) {
+           const err = await response.json(); throw new Error(err.detail || 'Failed to update pin assignments');
+         }
+        const updatedSystemData = await response.json();
+
+        setSystems(prevSystems => prevSystems.map(sys =>
+            sys.id === updatedSystemData.id ? updatedSystemData : sys
+        ));
+        setSelectedSystem(updatedSystemData);
+        setEditPinsModalVisible(false);
+        setTempPinAssignments(null);
+
+    } catch (error: any) {
+        console.error("Update pin assignments error:", error);
+        Alert.alert('Error', `Could not update pin assignments: ${error.message}`);
+         setEditPinsModalVisible(false);
+         setTempPinAssignments(null);
+    }
+  };
+
+   const handleDeleteFloor = (systemId: string, floorId: string) => {
+     Alert.alert("Delete Floor", "Are you sure?", [ // Check: Is this alert showing up?
+       { text: "Cancel", style: "cancel" },
+       { text: "Delete", style: "destructive", onPress: async () => { // Check: Is the code inside onPress running?
+          try {
+            console.log(`[Delete Floor] Attempting delete: System ${systemId}, Floor ${floorId}`); // Add log
+            const token = await AsyncStorage.getItem('token');
+            const response = await fetch(`${API_BASE}/systems/${systemId}/floors/${floorId}`, {
+                method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok && response.status !== 204) {
+                const err = await response.text();
+                console.error("[Delete Floor] Server error response:", err); // Add log
+                throw new Error(err || 'Failed to delete floor');
+            }
+
+            console.log("[Delete Floor] Success from server."); // Add log
+             // Optimistic UI update
+             const updatedSystem = systems.find(sys => sys.id === systemId);
+             if (updatedSystem) {
+                 const newFloors = updatedSystem.floors.filter(f => f.id !== floorId);
+                 const systemWithFloorDeleted = {...updatedSystem, floors: newFloors };
+                 setSystems(prev => prev.map(sys => sys.id === systemId ? systemWithFloorDeleted : sys));
+                 setSelectedSystem(systemWithFloorDeleted); // Update detail view state
+                 console.log("[Delete Floor] UI updated optimistically."); // Add log
+             } else {
+                 console.warn("[Delete Floor] Could not find system locally after delete attempt. Refetching."); // Add log
+                 await fetchSystems(); // Fallback refetch if something went wrong
+             }
+
+          } catch (error: any) {
+              console.error("[Delete Floor] CATCH BLOCK:", error); // Add log
+              Alert.alert('Error', `Could not delete floor: ${error.message}`);
+              // Refetch on error to ensure consistency
+              await fetchSystems();
+              // Also update selectedSystem if it exists after refetch
+              const refreshedSystem = systems.find(sys => sys.id === systemId);
+              setSelectedSystem(refreshedSystem || null);
+          }
+       }}
+     ]);
+   };
+  
+  const handleSaveFolderOrder = async (orderedFloors: Floor[]) => {
+      if (!selectedSystem) return;
+      setIsSavingOrder(true);
+      const orderedFloorIds = orderedFloors.map(f => f.id);
+      try {
+          const token = await AsyncStorage.getItem('token');
+          const response = await fetch(`${API_BASE}/systems/${selectedSystem.id}/floor_order`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify({ ordered_floor_ids: orderedFloorIds })
+          });
+          if (!response.ok) {
+              const err = await response.json(); throw new Error(err.detail || 'Failed to save order');
+          }
+          const updatedSystemData = await response.json();
+           setSystems(prevSystems => prevSystems.map(sys =>
+               sys.id === updatedSystemData.id ? updatedSystemData : sys
+           ));
+           setSelectedSystem(updatedSystemData);
+           console.log("Floor order saved successfully.");
+
+      } catch (error: any) {
+          console.error("Save floor order error:", error);
+          Alert.alert('Error', `Could not save floor order: ${error.message}`);
+          // Revert optimistic update on error by refetching or using original state
+          const originalSystem = systems.find(sys => sys.id === selectedSystem.id);
+          setSelectedSystem(originalSystem || null);
+
+      } finally {
+          setIsSavingOrder(false);
+      }
+  };
+
+
+  const handleSendData = async () => { /* ... */ };
+
+  // --- Modal Open/Close Handlers ---
+  const openAddSystemModalHandler = () => {
+    setNewSystemName('');
+    setNewSystemDescription('');
+    setAddSystemModalVisible(true);
+  };
+  const openDetailModalHandler = (system: System) => {
+    setSelectedSystem(system);
+    setDetailModalVisible(true);
+  };
+  const openAddFloorModalHandler = () => {
+    if (!selectedSystem) return;
+    setNewFloorName('');
+    setAddFloorModalVisible(true);
+   };
+
+  const openEditPinsModalHandler = () => {
+    if (!selectedSystem) return;
+    setTempPinAssignments(JSON.parse(JSON.stringify(selectedSystem)));
+    setEditPinsModalVisible(true);
+  };
+
+  const closeEditPinsModal = () => {
+      setEditPinsModalVisible(false);
+      setTempPinAssignments(null);
+  }
+
+  // --- Drag and Drop Handler ---
+  const handleDragEnd = ({ data: reorderedFloors }: { data: Floor[] }) => {
+    if (!selectedSystem) return;
+    // Optimistically update the selectedSystem state
+    const updatedSystem = { ...selectedSystem, floors: reorderedFloors };
+    setSelectedSystem(updatedSystem);
+    // Persist the new order to the backend
+    handleSaveFolderOrder(reorderedFloors);
+  };
+
+  const handlePinCellPress = (floorId: string, pin: string) => {
+    if (!tempPinAssignments) return;
+
+    const updatedSystem = JSON.parse(JSON.stringify(tempPinAssignments));
+    let pinCurrentlyAssignedTo: string | null = null;
+    let currentFloorIndex = -1;
+
+    updatedSystem.floors.forEach((floor: Floor, index: number) => {
+        if (floor.id === floorId) currentFloorIndex = index;
+        if (floor.pins.includes(pin)) pinCurrentlyAssignedTo = floor.id;
+    });
+
+    if (currentFloorIndex === -1) return;
+
+    if (pinCurrentlyAssignedTo === floorId) {
+        updatedSystem.floors[currentFloorIndex].pins = updatedSystem.floors[currentFloorIndex].pins.filter((p: string) => p !== pin);
+    } else {
+        if (pinCurrentlyAssignedTo) {
+             updatedSystem.floors.forEach((floor: Floor) => {
+                 if (floor.id === pinCurrentlyAssignedTo) {
+                     floor.pins = floor.pins.filter((p: string) => p !== pin);
+                 }
+             });
+        }
+        updatedSystem.floors[currentFloorIndex].pins.push(pin);
+    }
+    setTempPinAssignments(updatedSystem);
+  };
+
+
+  // --- Render Functions ---
+  const renderSystemCard = ({ item }: { item: System }) => (
+    <TouchableOpacity style={styles.systemCard} onPress={() => openDetailModalHandler(item)}>
+        <View style={styles.systemHeader}>
+            <MaterialCommunityIcons name="server-network" size={24} color="#00FFC2" />
+            <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleDeleteSystem(item.id); }}>
+                <MaterialCommunityIcons name="close-circle-outline" size={20} color="rgba(255, 255, 255, 0.4)" />
+            </TouchableOpacity>
         </View>
-      </View>
-      <TouchableOpacity onPress={() => handleDeleteSensor(item.id)}>
-        <MaterialCommunityIcons name="close-circle-outline" size={20} color="rgba(255, 255, 255, 0.4)" />
-      </TouchableOpacity>
-    </View>
+        <View style={styles.systemInfo}>
+            <Text style={styles.systemCardTitle} numberOfLines={1}>{item.name}</Text>
+            {item.description ? (
+                 <Text style={styles.systemCardDescription} numberOfLines={2} ellipsizeMode='tail'>
+                     {item.description}
+                 </Text>
+            ) : null }
+            <ScrollView style={styles.floorListInCard} nestedScrollEnabled={true}>
+                {item.floors.length > 0 ? (
+                    item.floors.map(floor => (
+                        <View key={floor.id} style={styles.floorStatusItem}>
+                            <View style={[
+                                styles.statusDot,
+                                floor.pins.length > 0 ? styles.statusDotGreen : styles.statusDotRed
+                            ]} />
+                            <Text style={styles.floorNameInCard} numberOfLines={1}>{floor.name}</Text>
+                        </View>
+                    ))
+                ) : (
+                    <Text style={styles.noFloorsInCardText}>No Floors</Text>
+                )}
+            </ScrollView>
+        </View>
+    </TouchableOpacity>
   );
 
+  // Updated render function for DraggableFlatList in Detail Modal
+  const renderFloorItem = useCallback(({ item: floor, drag, isActive }: RenderItemParams<Floor>) => {
+      if (!selectedSystem) return null;
+
+      return (
+          <ScaleDecorator>
+              <TouchableOpacity
+                  style={[ styles.floorListItem, isActive ? styles.floorListItemActive : {}, ]}
+                  onLongPress={drag} // Trigger drag on long press
+                  disabled={isActive} // Disable touch during drag
+              >
+                  {/* Drag Handle Icon */}
+                   <MaterialCommunityIcons name="drag-vertical" size={24} color="#888" style={styles.dragHandle} />
+                  {/* Floor Info */}
+                  <Text style={styles.floorName}>{floor.name}</Text>
+                  <Text style={styles.floorPins}>Pins: {floor.pins.join(', ') || 'None'}</Text>
+                  {/* Delete Button */}
+                  <TouchableOpacity style={styles.deleteFloorButton} onPress={() => handleDeleteFloor(selectedSystem.id, floor.id)}>
+                      <MaterialCommunityIcons name="trash-can-outline" size={20} color="#ff6b6b" />
+                  </TouchableOpacity>
+              </TouchableOpacity>
+          </ScaleDecorator>
+      );
+  }, [selectedSystem]); // Re-render only if selectedSystem changes (handleDeleteFloor doesn't change)
+
+
+  // --- Main Return ---
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <View style={styles.header}>
-        <Text style={styles.title}>My Sensors</Text>
-        <TimezoneDisplay />
-      </View>
-      <FlatList
-        data={sensors}
-        renderItem={renderSensor}
-        keyExtractor={item => item.id}
-        numColumns={4}
-        contentContainerStyle={styles.list}
-        columnWrapperStyle={{ gap: gap }}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons name="view-grid-plus-outline" size={60} color="#444" />
-            <Text style={styles.emptyText}>No Sensors Added</Text>
-            <Text style={styles.emptySubText}>Tap the '+' button to add your first sensor.</Text>
-          </View>
-        }
-      />
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={isModalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalView}>
-            <Text style={styles.modalTitle}>Add New Sensor</Text>
-            <TextInput style={styles.input} placeholder="Sensor Name (e.g., Temp-01)" placeholderTextColor="#666" value={newName} onChangeText={setNewName} />
-            <TextInput style={[styles.input, styles.descriptionInput]} placeholder="Description" placeholderTextColor="#666" value={newDescription} onChangeText={setNewDescription} multiline />
-            <Text style={styles.pinsLabel}>Select Pins:</Text>
-            <View style={styles.pinsContainer}>
-              {pinOptions.map(pin => (
-                <TouchableOpacity key={pin} style={[ styles.pinButton, selectedPins.includes(pin) && styles.pinButtonSelected ]} onPress={() => handlePinSelect(pin)}>
-                  <Text style={[ styles.pinButtonText, selectedPins.includes(pin) && styles.pinButtonTextSelected ]}>{pin}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setModalVisible(false)}>
-                <Text style={styles.buttonText}>Cancel</Text>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" />
+         <View style={styles.header}>
+          <Text style={styles.title}>My Systems</Text>
+          <View style={styles.headerActions}>
+              <TouchableOpacity onPress={handleSendData} style={styles.sendButton}>
+                  <MaterialCommunityIcons name="send-circle-outline" size={28} color="#00FFC2" />
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleSaveSensor}>
-                <Text style={[styles.buttonText, styles.saveButtonText]}>Save</Text>
-              </TouchableOpacity>
-            </View>
+              <TimezoneDisplay />
           </View>
         </View>
-      </Modal>
-      <TouchableOpacity style={styles.fab} onPress={openAddSensorModal}>
-        <MaterialCommunityIcons name="plus" size={30} color="#000" />
-      </TouchableOpacity>
-    </SafeAreaView>
+         <DraggableFlatList // Changed from FlatList
+             data={systems}
+             renderItem={renderSystemCard} // Use the existing card renderer
+             keyExtractor={item => item.id}
+             numColumns={numGridCols} // Keep grid layout
+             // Note: Dragging applies to the whole card now. If you only want vertical reorder, use numColumns={1}
+             // onDragEnd={({ data }) => setSystems(data)} // Example: If you want to reorder systems (needs backend endpoint)
+             contentContainerStyle={styles.list}
+             // columnWrapperStyle might not work as expected with DraggableFlatList in grid mode
+             ListEmptyComponent={
+                  <View style={styles.emptyContainer}>
+                      <MaterialCommunityIcons name="view-grid-plus-outline" size={60} color="#444" />
+                      <Text style={styles.emptyText}>No Systems Added</Text>
+                      <Text style={styles.emptySubText}>Tap the '+' button to add your first system.</Text>
+                  </View>
+             }
+           />
+
+        {/* --- ADD SYSTEM MODAL --- */}
+        <Modal visible={isAddSystemModalVisible} onRequestClose={() => setAddSystemModalVisible(false)} transparent={true} animationType="fade" >
+           <View style={styles.modalBackdrop}>
+               <View style={styles.modalView}>
+                  <Text style={styles.modalTitle}>Add New System</Text>
+                  <TextInput style={styles.input} placeholder="System Name" placeholderTextColor="#666" value={newSystemName} onChangeText={setNewSystemName}/>
+                  <TextInput style={[styles.input, styles.descriptionInput]} placeholder="Description" placeholderTextColor="#666" value={newSystemDescription} onChangeText={setNewSystemDescription} multiline/>
+                  <View style={styles.modalActions}>
+                    <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setAddSystemModalVisible(false)}>
+                      <Text style={styles.buttonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleSaveSystem}>
+                      <Text style={[styles.buttonText, styles.saveButtonText]}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
+               </View>
+            </View>
+        </Modal>
+
+         {/* --- SYSTEM DETAIL MODAL --- */}
+         <Modal visible={isDetailModalVisible} onRequestClose={() => setDetailModalVisible(false)} transparent={true} animationType="fade">
+             <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setDetailModalVisible(false)}>
+                 {selectedSystem && (
+                     <TouchableOpacity style={[styles.modalView, styles.detailModalView]} activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+                         <Text style={styles.modalTitle}>{selectedSystem.name}</Text>
+                         <Text style={styles.detailDescription}>{selectedSystem.description || 'No description.'}</Text>
+                         <Text style={styles.floorListTitle}>Floors: (Long press to reorder)</Text>
+                          <DraggableFlatList // Using DraggableFlatList here
+                              data={selectedSystem.floors}
+                              keyExtractor={(floor) => floor.id}
+                              renderItem={renderFloorItem} // Use specific render item
+                              onDragEnd={handleDragEnd} // Handle drop event
+                              ListEmptyComponent={<Text style={styles.noFloorsText}>No floors added yet.</Text>}
+                              style={styles.floorList}
+                          />
+                         <TouchableOpacity style={[styles.button, styles.addFloorButton]} onPress={openAddFloorModalHandler}>
+                             <Text style={styles.buttonText}>+ Add Floor</Text>
+                         </TouchableOpacity>
+                         <TouchableOpacity style={[styles.button, styles.editAllPinsButton]} onPress={openEditPinsModalHandler}>
+                             <Text style={styles.buttonText}>Edit Pin Assignments</Text>
+                         </TouchableOpacity>
+                          {isSavingOrder && <ActivityIndicator size="small" color="#aaa" style={styles.savingIndicator} />}
+                     </TouchableOpacity>
+                 )}
+             </TouchableOpacity>
+         </Modal>
+
+
+        {/* --- ADD FLOOR MODAL --- */}
+        <Modal visible={isAddFloorModalVisible} onRequestClose={() => setAddFloorModalVisible(false)} transparent={true} animationType="fade">
+           <View style={styles.modalBackdrop}>
+               <View style={styles.modalView}>
+                  <Text style={styles.modalTitle}>Add New Floor to {selectedSystem?.name}</Text>
+                  <TextInput style={styles.input} placeholder="Floor Name" placeholderTextColor="#666" value={newFloorName} onChangeText={setNewFloorName} autoFocus={true}/>
+                  <View style={styles.modalActions}>
+                    <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setAddFloorModalVisible(false)}>
+                      <Text style={styles.buttonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleAddFloor}>
+                      <Text style={[styles.buttonText, styles.saveButtonText]}>Add Floor</Text>
+                    </TouchableOpacity>
+                  </View>
+               </View>
+            </View>
+        </Modal>
+
+        {/* --- EDIT PINS MODAL --- */}
+        <Modal visible={isEditPinsModalVisible} onRequestClose={closeEditPinsModal} transparent={true} animationType="fade">
+           <View style={styles.modalBackdrop}>
+               <View style={[styles.modalView, styles.editPinsModalView]}>
+                  <Text style={styles.modalTitle}>Assign Pins for {tempPinAssignments?.name}</Text>
+                  <ScrollView horizontal={true} contentContainerStyle={styles.pinMatrixScrollView}>
+                    <View>
+                        <View style={[styles.pinMatrixRow, styles.pinMatrixHeaderRow]}>
+                            <View style={styles.floorHeaderCell}><Text style={styles.pinMatrixHeaderText}></Text></View>
+                            {AVAILABLE_PINS.map(pin => (
+                                <View key={pin} style={styles.pinHeaderCell}><Text style={styles.pinMatrixHeaderText}>{pin}</Text></View>
+                            ))}
+                        </View>
+                        {tempPinAssignments?.floors.map((floor) => {
+                            const takenByOthers = new Set<string>();
+                            tempPinAssignments.floors.forEach(otherFloor => {
+                                if (otherFloor.id !== floor.id) {
+                                    otherFloor.pins.forEach(p => takenByOthers.add(p));
+                                }
+                            });
+
+                            return (
+                                <View key={floor.id} style={styles.pinMatrixRow}>
+                                    <View style={styles.floorHeaderCell}><Text style={styles.floorNameText}>{floor.name}</Text></View>
+                                    {AVAILABLE_PINS.map(pin => {
+                                        const isAssignedToCurrent = floor.pins.includes(pin);
+                                        const isAssignedToOther = takenByOthers.has(pin);
+                                        const isDisabled = isAssignedToOther && !isAssignedToCurrent;
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={`${floor.id}-${pin}`}
+                                                style={[
+                                                    styles.pinCell,
+                                                    isAssignedToCurrent && styles.pinCellSelected,
+                                                    isAssignedToOther && !isAssignedToCurrent && styles.pinCellTaken,
+                                                ]}
+                                                onPress={() => handlePinCellPress(floor.id, pin)}
+                                                disabled={isDisabled}
+                                            />
+                                        );
+                                    })}
+                                </View>
+                            );
+                        })}
+                    </View>
+                  </ScrollView>
+                  <View style={styles.modalActions}>
+                    <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={closeEditPinsModal}>
+                      <Text style={styles.buttonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleUpdateSystemPinAssignments}>
+                      <Text style={[styles.buttonText, styles.saveButtonText]}>Save Assignments</Text>
+                    </TouchableOpacity>
+                  </View>
+               </View>
+            </View>
+        </Modal>
+
+        <TouchableOpacity style={styles.fab} onPress={openAddSystemModalHandler}>
+          <MaterialCommunityIcons name="plus" size={30} color="#000" />
+        </TouchableOpacity>
+      </SafeAreaView>
   );
 }
 
+// --- Styles ---
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#000000' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10, },
@@ -236,40 +595,150 @@ const styles = StyleSheet.create({
     timeContainer: { alignItems: 'flex-end' },
     timeText: { color: '#fff', fontSize: 16 },
     timezoneText: { color: '#888', fontSize: 12 },
-    list: { paddingHorizontal: 20, paddingTop: 20 },
-    sensorCard: {
-      width: cardWidth,
-      height: cardWidth * 0.7,
-      backgroundColor: 'rgba(28, 28, 30, 0.7)',
-      borderRadius: 12,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: 15,
-      marginBottom: 10,
+    list: { paddingHorizontal: 20, paddingTop: 10 },
+    systemCard: {
+        width: cardWidth,
+        minHeight: cardWidth * 0.75,
+        backgroundColor: '#1C1C1E',
+        borderRadius: 12,
+        padding: 12,
+        justifyContent: 'flex-start',
+        marginBottom: 10,
     },
-    sensorInfo: { flexDirection: 'row', alignItems: 'center' },
-    sensorCardTitle: { color: '#fff', fontWeight: 'bold', fontSize: 14, },
-    sensorCardPins: { color: '#00FFC2', fontSize: 12, marginTop: 2, },
-    emptyContainer: { alignItems: 'center', paddingTop: '20%' },
+    systemHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        marginBottom: 10,
+    },
+    systemInfo: {
+        alignSelf: 'stretch',
+        flex: 1,
+    },
+    systemCardTitle: {
+        color: '#FFFFFF',
+        fontWeight: 'bold',
+        fontSize: 15,
+        marginBottom: 4,
+    },
+    systemCardDescription: {
+        color: '#a0a0a0',
+        fontSize: 11,
+        marginBottom: 6,
+    },
+    floorListInCard: {
+        flex: 1,
+        marginTop: 4,
+    },
+    floorStatusItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 5,
+    },
+    statusDot: {
+        width: 9,
+        height: 9,
+        borderRadius: 4.5,
+        marginRight: 7,
+    },
+    statusDotGreen: {
+        backgroundColor: '#2ecc71',
+    },
+    statusDotRed: {
+        backgroundColor: '#e74c3c',
+    },
+    floorNameInCard: {
+        color: '#D0D0D0',
+        fontSize: 13,
+        flexShrink: 1,
+    },
+    noFloorsInCardText: {
+        color: '#888',
+        fontSize: 13,
+        fontStyle: 'italic',
+        marginTop: 4,
+    },
+    headerActions: { flexDirection: 'row', alignItems: 'center', },
+    sendButton: { marginRight: 15, padding: 5, },
+    emptyContainer: { alignItems: 'center', paddingTop: '20%', flex: 1, justifyContent: 'center' },
     emptyText: { color: '#999', fontSize: 20, fontWeight: 'bold', marginTop: 15 },
-    emptySubText: { color: '#666', fontSize: 14, marginTop: 5 },
-    fab: { position: 'absolute', width: 60, height: 60, borderRadius: 30, backgroundColor: '#00FFC2', justifyContent: 'center', alignItems: 'center', right: 20, bottom: 30, elevation: 8, },
+    emptySubText: { color: '#666', fontSize: 14, marginTop: 5, textAlign: 'center' },
+    fab: { position: 'absolute', width: 60, height: 60, borderRadius: 30, backgroundColor: '#00FFC2', justifyContent: 'center', alignItems: 'center', right: 20, bottom: 30, elevation: 8, shadowColor: '#00FFC2', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }},
     modalBackdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.7)', },
-    modalView: { width: '90%', maxWidth: 500, backgroundColor: '#1E1E1E', borderRadius: 20, padding: 25, alignItems: 'stretch', },
-    modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff', marginBottom: 20, textAlign: 'center', },
+    modalView: { width: '90%', maxWidth: 400, backgroundColor: '#1E1E1E', borderRadius: 20, padding: 25, alignItems: 'stretch', },
+    modalTitle: { fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 20, textAlign: 'center', },
     input: { backgroundColor: '#2b2b2b', color: '#fff', borderRadius: 10, padding: 15, marginBottom: 15, fontSize: 16, },
     descriptionInput: { height: 80, textAlignVertical: 'top' },
-    pinsLabel: { color: '#999', fontSize: 14, marginBottom: 10 },
-    pinsContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 25, },
-    pinButton: { borderWidth: 1, borderColor: '#555', borderRadius: 20, width: 60, height: 40, justifyContent: 'center', alignItems: 'center', },
-    pinButtonSelected: { backgroundColor: '#00FFC2', borderColor: '#00FFC2' },
-    pinButtonText: { color: '#999', fontSize: 16, fontWeight: 'bold' },
-    pinButtonTextSelected: { color: '#000' },
-    modalActions: { flexDirection: 'row', justifyContent: 'space-between' },
-    button: { flex: 1, padding: 15, borderRadius: 10, alignItems: 'center' },
-    cancelButton: { backgroundColor: '#333', marginRight: 10 },
-    saveButton: { backgroundColor: '#007AFF' },
+    modalActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
+    button: { paddingVertical: 12, paddingHorizontal: 15, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    cancelButton: { backgroundColor: '#333', marginRight: 10, flex: 1 },
+    saveButton: { backgroundColor: '#007AFF', flex: 1 },
     buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
     saveButtonText: { color: '#fff' },
+    // Detail Modal Styles
+    detailModalView: { maxHeight: '85%', width: '90%', maxWidth: 550 }, // Adjusted size
+    detailDescription: { color: '#b0b0b0', fontSize: 15, textAlign: 'center', marginBottom: 20, },
+    floorListTitle: { fontSize: 16, fontWeight: '600', color: '#ccc', marginBottom: 10, borderBottomWidth: 1, borderBottomColor: '#444', paddingBottom: 5 },
+    floorList: { width: '100%', maxHeight: 300, marginBottom: 15 },
+    floorListItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#2a2a2a',
+        paddingVertical: 10,
+        paddingRight: 15, // Keep right padding
+        borderRadius: 8,
+        marginBottom: 8,
+    },
+    floorListItemActive: {
+        backgroundColor: '#3a3a3a',
+        opacity: 0.9,
+        shadowColor: "#000",
+        shadowOffset: {	width: 0, height: 2, },
+	    shadowOpacity: 0.25,
+	    shadowRadius: 3.84,
+	    elevation: 5,
+    },
+    dragHandle: {
+        marginRight: 10,
+        paddingLeft: 10,
+    },
+    floorName: { color: '#eee', fontSize: 15, flex: 2, marginRight: 10 },
+    floorPins: { color: '#888', fontSize: 12, flex: 3, marginRight: 10 },
+    deleteFloorButton: { padding: 5, marginLeft: 10 },
+    noFloorsText: { color: '#888', textAlign: 'center', marginTop: 15, fontStyle: 'italic' },
+    addFloorButton: { backgroundColor: '#007AFF', marginBottom: 10, alignSelf: 'stretch' },
+    editAllPinsButton: { backgroundColor: '#5856D6', alignSelf: 'stretch' },
+    savingIndicator: {
+        marginTop: 10,
+    },
+
+    // Edit Pins Modal Styles
+    editPinsModalView: { width: '95%', maxWidth: 800 },
+    pinMatrixScrollView: { paddingBottom: 10 },
+    pinMatrixRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 5},
+    pinMatrixHeaderRow: { borderBottomWidth: 1, borderBottomColor: '#555', paddingBottom: 8, marginBottom: 8},
+    floorHeaderCell: { width: 100, paddingRight: 10, alignItems: 'flex-start'},
+    pinHeaderCell: { width: 45, alignItems: 'center'},
+    pinMatrixHeaderText: { color: '#aaa', fontSize: 12, fontWeight: 'bold'},
+    floorNameText: { color: '#eee', fontSize: 14, fontWeight: '500'},
+    pinCell: {
+        width: 45, height: 35,
+        borderRadius: 6,
+        backgroundColor: '#444',
+        borderWidth: 1,
+        borderColor: '#555',
+        marginHorizontal: 3,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    pinCellSelected: {
+        backgroundColor: '#2ecc71', // Green
+        borderColor: '#27ae60',
+    },
+    pinCellTaken: {
+        backgroundColor: '#e74c3c', // Red
+        borderColor: '#c0392b',
+        opacity: 0.7,
+    },
 });
