@@ -10,6 +10,7 @@ import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-nativ
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+// NOTE: Ensure GestureHandlerRootView wraps your app, typically in _layout.tsx
 
 const API_BASE = Platform.select({
   ios: "http://localhost:8000",
@@ -176,7 +177,35 @@ export default function HomeScreen() {
       }
     };
 
+  // --- MODIFIED: This function is now fixed and will show pop-ups ---
+  const handleSendData = async () => {
+    // REMOVED the broken Alert.alert wrapper
+    try {
+      console.log("[Send Data] Attempting to send...");
+      const token = await AsyncStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/systems/send`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const data = await response.json();
+      if (!response.ok) {
+          console.error("[Send Data] Server error:", data.detail);
+          throw new Error(data.detail || 'Failed to send data');
+      }
 
+      // This "Success" pop-up will now appear
+      console.log("[Send Data] Success:", data.message);
+      Alert.alert('Success', data.message || 'Data sent successfully!');
+
+    } catch (error: any) {
+      // This "Error" pop-up will now appear on failure
+      console.error("[Send Data] Catch Block:", error.message);
+      Alert.alert('Error', error.message || 'An unknown error occurred.');
+    }
+  };
+
+  // --- MODIFIED: This function now calls handleSendData on success ---
   const handleUpdateSystemPinAssignments = async () => {
     if (!tempPinAssignments) return;
 
@@ -206,6 +235,12 @@ export default function HomeScreen() {
         setEditPinsModalVisible(false);
         setTempPinAssignments(null);
 
+        // --- NEW FEATURE ---
+        // After successfully saving, automatically send data to Divyani
+        console.log("Pin assignments saved. Now sending data to external API...");
+        await handleSendData(); // <--- CALLS THE FIXED SEND FUNCTION
+        // --- END NEW FEATURE ---
+
     } catch (error: any) {
         console.error("Update pin assignments error:", error);
         Alert.alert('Error', `Could not update pin assignments: ${error.message}`);
@@ -214,8 +249,7 @@ export default function HomeScreen() {
     }
   };
 
-  // --- TEMPORARY handleDeleteFloor (NO ALERT) ---
-  const handleDeleteFloor = async (systemId: string, floorId: string) => {
+   const handleDeleteFloor = async (systemId: string, floorId: string) => {
     try {
       console.log(`[Delete Floor Test] Attempting delete: System ${systemId}, Floor ${floorId}`);
       const token = await AsyncStorage.getItem('token');
@@ -283,8 +317,6 @@ export default function HomeScreen() {
       }
   };
 
-
-  const handleSendData = async () => { /* ... */ };
 
   // --- Modal Open/Close Handlers ---
   const openAddSystemModalHandler = () => {
@@ -386,8 +418,6 @@ export default function HomeScreen() {
     </TouchableOpacity>
   );
 
-  // Updated render function for DraggableFlatList in Detail Modal
-  // *** THIS IS THE FIX: Added handleDeleteFloor to the dependency array ***
   const renderFloorItem = useCallback(({ item: floor, drag, isActive }: RenderItemParams<Floor>) => {
       if (!selectedSystem) return null;
 
@@ -410,7 +440,7 @@ export default function HomeScreen() {
               </TouchableOpacity>
           </ScaleDecorator>
       );
-  }, [selectedSystem, handleDeleteFloor]); // <-- FIX IS HERE
+  }, [selectedSystem, handleDeleteFloor]); // <-- FIX: Added handleDeleteFloor dependency
 
 
   // --- Main Return ---
@@ -426,7 +456,6 @@ export default function HomeScreen() {
               <TimezoneDisplay />
           </View>
         </View>
-         {/* Use a regular FlatList for the main system grid */}
          <FlatList
              data={systems}
              renderItem={renderSystemCard}
@@ -470,7 +499,7 @@ export default function HomeScreen() {
                          <Text style={styles.modalTitle}>{selectedSystem.name}</Text>
                          <Text style={styles.detailDescription}>{selectedSystem.description || 'No description.'}</Text>
                          <Text style={styles.floorListTitle}>Floors: (Long press to reorder)</Text>
-                          <DraggableFlatList // This is the correct place for DraggableFlatList
+                          <DraggableFlatList
                               data={selectedSystem.floors}
                               keyExtractor={(floor) => floor.id}
                               renderItem={renderFloorItem}
