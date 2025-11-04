@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
-  FlatList, // <--- Correctly import FlatList
+  FlatList, // Use FlatList for the main grid
   TextInput, Alert, StatusBar, Modal, Dimensions, Platform, ScrollView, ActivityIndicator
 } from 'react-native';
 // Import DraggableFlatList separately
@@ -10,7 +10,6 @@ import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-nativ
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-// NOTE: Ensure GestureHandlerRootView wraps your app, typically in _layout.tsx
 
 const API_BASE = Platform.select({
   ios: "http://localhost:8000",
@@ -388,6 +387,7 @@ export default function HomeScreen() {
   );
 
   // Updated render function for DraggableFlatList in Detail Modal
+  // *** THIS IS THE FIX: Added handleDeleteFloor to the dependency array ***
   const renderFloorItem = useCallback(({ item: floor, drag, isActive }: RenderItemParams<Floor>) => {
       if (!selectedSystem) return null;
 
@@ -410,7 +410,7 @@ export default function HomeScreen() {
               </TouchableOpacity>
           </ScaleDecorator>
       );
-  }, [selectedSystem]);
+  }, [selectedSystem, handleDeleteFloor]); // <-- FIX IS HERE
 
 
   // --- Main Return ---
@@ -426,7 +426,7 @@ export default function HomeScreen() {
               <TimezoneDisplay />
           </View>
         </View>
-         {/* --- THIS IS THE CORRECTED SYSTEM LIST --- */}
+         {/* Use a regular FlatList for the main system grid */}
          <FlatList
              data={systems}
              renderItem={renderSystemCard}
