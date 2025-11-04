@@ -2,9 +2,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
-  TextInput, Alert, StatusBar, Modal, Dimensions, Platform, ScrollView, ActivityIndicator // Added ActivityIndicator
+  FlatList, // <--- Correctly import FlatList
+  TextInput, Alert, StatusBar, Modal, Dimensions, Platform, ScrollView, ActivityIndicator
 } from 'react-native';
-// Removed FlatList import, using DraggableFlatList now
+// Import DraggableFlatList separately
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -63,7 +64,7 @@ export default function HomeScreen() {
   const [isDetailModalVisible, setDetailModalVisible] = useState(false);
   const [isAddFloorModalVisible, setAddFloorModalVisible] = useState(false);
   const [isEditPinsModalVisible, setEditPinsModalVisible] = useState(false);
-  const [isSavingOrder, setIsSavingOrder] = useState(false); // Saving order state
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
 
   const [selectedSystem, setSelectedSystem] = useState<System | null>(null);
   const [tempPinAssignments, setTempPinAssignments] = useState<System | null>(null);
@@ -138,7 +139,6 @@ export default function HomeScreen() {
   };
 
   const handleAddFloor = async () => {
-      // Frontend check for empty name and uniqueness
       if (!newFloorName.trim() || !selectedSystem) {
         Alert.alert('Error', 'Floor name cannot be empty.');
         return;
@@ -154,10 +154,9 @@ export default function HomeScreen() {
 
       try {
           const token = await AsyncStorage.getItem('token');
-          // Backend will also check uniqueness, but frontend check improves UX
           const response = await fetch(`${API_BASE}/systems/${selectedSystem.id}/floors`, {
               method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-              body: JSON.stringify({ name: trimmedName }) // Send trimmed name
+              body: JSON.stringify({ name: trimmedName })
           });
           if (!response.ok) {
              const err = await response.json(); throw new Error(err.detail || 'Failed to add floor');
@@ -216,50 +215,43 @@ export default function HomeScreen() {
     }
   };
 
-   const handleDeleteFloor = (systemId: string, floorId: string) => {
-     Alert.alert("Delete Floor", "Are you sure?", [ // Check: Is this alert showing up?
-       { text: "Cancel", style: "cancel" },
-       { text: "Delete", style: "destructive", onPress: async () => { // Check: Is the code inside onPress running?
-          try {
-            console.log(`[Delete Floor] Attempting delete: System ${systemId}, Floor ${floorId}`); // Add log
-            const token = await AsyncStorage.getItem('token');
-            const response = await fetch(`${API_BASE}/systems/${systemId}/floors/${floorId}`, {
-                method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
-            });
+  // --- TEMPORARY handleDeleteFloor (NO ALERT) ---
+  const handleDeleteFloor = async (systemId: string, floorId: string) => {
+    try {
+      console.log(`[Delete Floor Test] Attempting delete: System ${systemId}, Floor ${floorId}`);
+      const token = await AsyncStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/systems/${systemId}/floors/${floorId}`, {
+          method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
+      });
 
-            if (!response.ok && response.status !== 204) {
-                const err = await response.text();
-                console.error("[Delete Floor] Server error response:", err); // Add log
-                throw new Error(err || 'Failed to delete floor');
-            }
+      if (!response.ok && response.status !== 204) {
+          const err = await response.text();
+          console.error("[Delete Floor Test] Server error response:", err);
+          throw new Error(err || 'Failed to delete floor');
+      }
 
-            console.log("[Delete Floor] Success from server."); // Add log
-             // Optimistic UI update
-             const updatedSystem = systems.find(sys => sys.id === systemId);
-             if (updatedSystem) {
-                 const newFloors = updatedSystem.floors.filter(f => f.id !== floorId);
-                 const systemWithFloorDeleted = {...updatedSystem, floors: newFloors };
-                 setSystems(prev => prev.map(sys => sys.id === systemId ? systemWithFloorDeleted : sys));
-                 setSelectedSystem(systemWithFloorDeleted); // Update detail view state
-                 console.log("[Delete Floor] UI updated optimistically."); // Add log
-             } else {
-                 console.warn("[Delete Floor] Could not find system locally after delete attempt. Refetching."); // Add log
-                 await fetchSystems(); // Fallback refetch if something went wrong
-             }
+      console.log("[Delete Floor Test] Success from server.");
+       const currentSelectedSystem = systems.find(sys => sys.id === systemId);
+       if (currentSelectedSystem) {
+           const newFloors = currentSelectedSystem.floors.filter(f => f.id !== floorId);
+           const systemWithFloorDeleted = {...currentSelectedSystem, floors: newFloors };
+           setSystems(prev => prev.map(sys => sys.id === systemId ? systemWithFloorDeleted : sys));
+           setSelectedSystem(systemWithFloorDeleted);
+           console.log("[Delete Floor Test] UI updated optimistically.");
+       } else {
+           console.warn("[Delete Floor Test] Could not find system locally after delete attempt. Refetching.");
+           await fetchSystems();
+       }
 
-          } catch (error: any) {
-              console.error("[Delete Floor] CATCH BLOCK:", error); // Add log
-              Alert.alert('Error', `Could not delete floor: ${error.message}`);
-              // Refetch on error to ensure consistency
-              await fetchSystems();
-              // Also update selectedSystem if it exists after refetch
-              const refreshedSystem = systems.find(sys => sys.id === systemId);
-              setSelectedSystem(refreshedSystem || null);
-          }
-       }}
-     ]);
-   };
-  
+    } catch (error: any) {
+        console.error("[Delete Floor Test] CATCH BLOCK:", error);
+        Alert.alert('Error', `Could not delete floor: ${error.message}`);
+        await fetchSystems();
+        const refreshedSystem = systems.find(sys => sys.id === systemId);
+        setSelectedSystem(refreshedSystem || null);
+    }
+  };
+
   const handleSaveFolderOrder = async (orderedFloors: Floor[]) => {
       if (!selectedSystem) return;
       setIsSavingOrder(true);
@@ -284,7 +276,6 @@ export default function HomeScreen() {
       } catch (error: any) {
           console.error("Save floor order error:", error);
           Alert.alert('Error', `Could not save floor order: ${error.message}`);
-          // Revert optimistic update on error by refetching or using original state
           const originalSystem = systems.find(sys => sys.id === selectedSystem.id);
           setSelectedSystem(originalSystem || null);
 
@@ -326,10 +317,8 @@ export default function HomeScreen() {
   // --- Drag and Drop Handler ---
   const handleDragEnd = ({ data: reorderedFloors }: { data: Floor[] }) => {
     if (!selectedSystem) return;
-    // Optimistically update the selectedSystem state
     const updatedSystem = { ...selectedSystem, floors: reorderedFloors };
     setSelectedSystem(updatedSystem);
-    // Persist the new order to the backend
     handleSaveFolderOrder(reorderedFloors);
   };
 
@@ -406,22 +395,22 @@ export default function HomeScreen() {
           <ScaleDecorator>
               <TouchableOpacity
                   style={[ styles.floorListItem, isActive ? styles.floorListItemActive : {}, ]}
-                  onLongPress={drag} // Trigger drag on long press
-                  disabled={isActive} // Disable touch during drag
+                  onLongPress={drag}
+                  disabled={isActive}
               >
-                  {/* Drag Handle Icon */}
                    <MaterialCommunityIcons name="drag-vertical" size={24} color="#888" style={styles.dragHandle} />
-                  {/* Floor Info */}
                   <Text style={styles.floorName}>{floor.name}</Text>
                   <Text style={styles.floorPins}>Pins: {floor.pins.join(', ') || 'None'}</Text>
-                  {/* Delete Button */}
-                  <TouchableOpacity style={styles.deleteFloorButton} onPress={() => handleDeleteFloor(selectedSystem.id, floor.id)}>
+                  <TouchableOpacity
+                      style={styles.deleteFloorButton}
+                      onPress={() => handleDeleteFloor(selectedSystem.id, floor.id)} // Calls direct function
+                  >
                       <MaterialCommunityIcons name="trash-can-outline" size={20} color="#ff6b6b" />
                   </TouchableOpacity>
               </TouchableOpacity>
           </ScaleDecorator>
       );
-  }, [selectedSystem]); // Re-render only if selectedSystem changes (handleDeleteFloor doesn't change)
+  }, [selectedSystem]);
 
 
   // --- Main Return ---
@@ -437,15 +426,14 @@ export default function HomeScreen() {
               <TimezoneDisplay />
           </View>
         </View>
-         <DraggableFlatList // Changed from FlatList
+         {/* --- THIS IS THE CORRECTED SYSTEM LIST --- */}
+         <FlatList
              data={systems}
-             renderItem={renderSystemCard} // Use the existing card renderer
+             renderItem={renderSystemCard}
              keyExtractor={item => item.id}
-             numColumns={numGridCols} // Keep grid layout
-             // Note: Dragging applies to the whole card now. If you only want vertical reorder, use numColumns={1}
-             // onDragEnd={({ data }) => setSystems(data)} // Example: If you want to reorder systems (needs backend endpoint)
+             numColumns={numGridCols}
              contentContainerStyle={styles.list}
-             // columnWrapperStyle might not work as expected with DraggableFlatList in grid mode
+             columnWrapperStyle={{ gap: gap }}
              ListEmptyComponent={
                   <View style={styles.emptyContainer}>
                       <MaterialCommunityIcons name="view-grid-plus-outline" size={60} color="#444" />
@@ -482,11 +470,11 @@ export default function HomeScreen() {
                          <Text style={styles.modalTitle}>{selectedSystem.name}</Text>
                          <Text style={styles.detailDescription}>{selectedSystem.description || 'No description.'}</Text>
                          <Text style={styles.floorListTitle}>Floors: (Long press to reorder)</Text>
-                          <DraggableFlatList // Using DraggableFlatList here
+                          <DraggableFlatList // This is the correct place for DraggableFlatList
                               data={selectedSystem.floors}
                               keyExtractor={(floor) => floor.id}
-                              renderItem={renderFloorItem} // Use specific render item
-                              onDragEnd={handleDragEnd} // Handle drop event
+                              renderItem={renderFloorItem}
+                              onDragEnd={handleDragEnd}
                               ListEmptyComponent={<Text style={styles.noFloorsText}>No floors added yet.</Text>}
                               style={styles.floorList}
                           />
@@ -677,7 +665,7 @@ const styles = StyleSheet.create({
     buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
     saveButtonText: { color: '#fff' },
     // Detail Modal Styles
-    detailModalView: { maxHeight: '85%', width: '90%', maxWidth: 550 }, // Adjusted size
+    detailModalView: { maxHeight: '85%', width: '90%', maxWidth: 550 },
     detailDescription: { color: '#b0b0b0', fontSize: 15, textAlign: 'center', marginBottom: 20, },
     floorListTitle: { fontSize: 16, fontWeight: '600', color: '#ccc', marginBottom: 10, borderBottomWidth: 1, borderBottomColor: '#444', paddingBottom: 5 },
     floorList: { width: '100%', maxHeight: 300, marginBottom: 15 },
@@ -686,7 +674,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: '#2a2a2a',
         paddingVertical: 10,
-        paddingRight: 15, // Keep right padding
+        paddingRight: 15,
         borderRadius: 8,
         marginBottom: 8,
     },
@@ -709,9 +697,7 @@ const styles = StyleSheet.create({
     noFloorsText: { color: '#888', textAlign: 'center', marginTop: 15, fontStyle: 'italic' },
     addFloorButton: { backgroundColor: '#007AFF', marginBottom: 10, alignSelf: 'stretch' },
     editAllPinsButton: { backgroundColor: '#5856D6', alignSelf: 'stretch' },
-    savingIndicator: {
-        marginTop: 10,
-    },
+    savingIndicator: { marginTop: 10, },
 
     // Edit Pins Modal Styles
     editPinsModalView: { width: '95%', maxWidth: 800 },
