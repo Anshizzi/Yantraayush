@@ -10,7 +10,6 @@ import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-nativ
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-// NOTE: Ensure GestureHandlerRootView wraps your app, typically in _layout.tsx
 
 const API_BASE = Platform.select({
   ios: "http://localhost:8000",
@@ -52,7 +51,7 @@ const TimezoneDisplay = () => {
 };
 
 // Layout Constants
-const { width: windowWidth } = Dimensions.get('window');
+const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
 const gap = 10;
 const numGridCols = 4;
 const totalGapSpace = (numGridCols - 1) * gap;
@@ -61,13 +60,18 @@ const cardWidth = (windowWidth - 40 - totalGapSpace) / numGridCols;
 export default function HomeScreen() {
   const [systems, setSystems] = useState<System[]>([]);
   const [isAddSystemModalVisible, setAddSystemModalVisible] = useState(false);
-  const [isDetailModalVisible, setDetailModalVisible] = useState(false);
+  const [isFloorManagerModalVisible, setFloorManagerModalVisible] = useState(false);
   const [isAddFloorModalVisible, setAddFloorModalVisible] = useState(false);
   const [isEditPinsModalVisible, setEditPinsModalVisible] = useState(false);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
-
+  
+  const [isSystemOptionsModalVisible, setSystemOptionsModalVisible] = useState(false);
+  const [isGenerateGraphsModalVisible, setGenerateGraphsModalVisible] = useState(false);
+  
   const [selectedSystem, setSelectedSystem] = useState<System | null>(null);
   const [tempPinAssignments, setTempPinAssignments] = useState<System | null>(null);
+  
+  const [hasAssignedPins, setHasAssignedPins] = useState(false);
 
   const [newSystemName, setNewSystemName] = useState('');
   const [newSystemDescription, setNewSystemDescription] = useState('');
@@ -167,9 +171,9 @@ export default function HomeScreen() {
               sys.id === updatedSystemData.id ? updatedSystemData : sys
           ));
           setSelectedSystem(updatedSystemData);
-
-          setAddFloorModalVisible(false);
           setNewFloorName('');
+          // Go back to floor manager after adding
+          backToFloorManager(); 
 
       } catch (error: any) {
           console.error("Add floor error:", error);
@@ -177,9 +181,7 @@ export default function HomeScreen() {
       }
     };
 
-  // --- MODIFIED: This function is now fixed and will show pop-ups ---
   const handleSendData = async () => {
-    // REMOVED the broken Alert.alert wrapper
     try {
       console.log("[Send Data] Attempting to send...");
       const token = await AsyncStorage.getItem('token');
@@ -194,18 +196,15 @@ export default function HomeScreen() {
           throw new Error(data.detail || 'Failed to send data');
       }
 
-      // This "Success" pop-up will now appear
       console.log("[Send Data] Success:", data.message);
       Alert.alert('Success', data.message || 'Data sent successfully!');
 
     } catch (error: any) {
-      // This "Error" pop-up will now appear on failure
       console.error("[Send Data] Catch Block:", error.message);
       Alert.alert('Error', error.message || 'An unknown error occurred.');
     }
   };
 
-  // --- MODIFIED: This function now calls handleSendData on success ---
   const handleUpdateSystemPinAssignments = async () => {
     if (!tempPinAssignments) return;
 
@@ -234,13 +233,9 @@ export default function HomeScreen() {
         setSelectedSystem(updatedSystemData);
         setEditPinsModalVisible(false);
         setTempPinAssignments(null);
-
-        // --- NEW FEATURE ---
-        // After successfully saving, automatically send data to Divyani
+        
         console.log("Pin assignments saved. Now sending data to external API...");
-        await handleSendData(); // <--- CALLS THE FIXED SEND FUNCTION
-        // --- END NEW FEATURE ---
-
+        await handleSendData();
     } catch (error: any) {
         console.error("Update pin assignments error:", error);
         Alert.alert('Error', `Could not update pin assignments: ${error.message}`);
@@ -324,26 +319,46 @@ export default function HomeScreen() {
     setNewSystemDescription('');
     setAddSystemModalVisible(true);
   };
-  const openDetailModalHandler = (system: System) => {
+
+  const openSystemOptionsModal = (system: System) => {
     setSelectedSystem(system);
-    setDetailModalVisible(true);
+    const hasPins = system.floors.some(floor => floor.pins.length > 0);
+    setHasAssignedPins(hasPins);
+    setSystemOptionsModalVisible(true);
   };
+
   const openAddFloorModalHandler = () => {
     if (!selectedSystem) return;
     setNewFloorName('');
-    setAddFloorModalVisible(true);
+    setFloorManagerModalVisible(false); // Close floor manager
+    setAddFloorModalVisible(true); // Open add floor
    };
 
   const openEditPinsModalHandler = () => {
     if (!selectedSystem) return;
     setTempPinAssignments(JSON.parse(JSON.stringify(selectedSystem)));
+    setSystemOptionsModalVisible(false);
     setEditPinsModalVisible(true);
   };
+  
+  // --- NEW Navigation Functions ---
+  const backToOptions = () => {
+    setFloorManagerModalVisible(false);
+    setEditPinsModalVisible(false);
+    setGenerateGraphsModalVisible(false);
+    setSystemOptionsModalVisible(true);
+  };
 
-  const closeEditPinsModal = () => {
-      setEditPinsModalVisible(false);
-      setTempPinAssignments(null);
-  }
+  const backToFloorManager = () => {
+    setAddFloorModalVisible(false);
+    setFloorManagerModalVisible(true);
+  };
+  
+  const cancelEditPins = () => {
+    setEditPinsModalVisible(false);
+    setTempPinAssignments(null);
+    backToOptions(); // Go back to options instead of closing
+  };
 
   // --- Drag and Drop Handler ---
   const handleDragEnd = ({ data: reorderedFloors }: { data: Floor[] }) => {
@@ -385,7 +400,7 @@ export default function HomeScreen() {
 
   // --- Render Functions ---
   const renderSystemCard = ({ item }: { item: System }) => (
-    <TouchableOpacity style={styles.systemCard} onPress={() => openDetailModalHandler(item)}>
+    <TouchableOpacity style={styles.systemCard} onPress={() => openSystemOptionsModal(item)}>
         <View style={styles.systemHeader}>
             <MaterialCommunityIcons name="server-network" size={24} color="#00FFC2" />
             <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleDeleteSystem(item.id); }}>
@@ -433,14 +448,14 @@ export default function HomeScreen() {
                   <Text style={styles.floorPins}>Pins: {floor.pins.join(', ') || 'None'}</Text>
                   <TouchableOpacity
                       style={styles.deleteFloorButton}
-                      onPress={() => handleDeleteFloor(selectedSystem.id, floor.id)} // Calls direct function
+                      onPress={() => handleDeleteFloor(selectedSystem.id, floor.id)}
                   >
                       <MaterialCommunityIcons name="trash-can-outline" size={20} color="#ff6b6b" />
                   </TouchableOpacity>
               </TouchableOpacity>
           </ScaleDecorator>
       );
-  }, [selectedSystem, handleDeleteFloor]); // <-- FIX: Added handleDeleteFloor dependency
+  }, [selectedSystem, handleDeleteFloor]);
 
 
   // --- Main Return ---
@@ -491,11 +506,11 @@ export default function HomeScreen() {
             </View>
         </Modal>
 
-         {/* --- SYSTEM DETAIL MODAL --- */}
-         <Modal visible={isDetailModalVisible} onRequestClose={() => setDetailModalVisible(false)} transparent={true} animationType="fade">
-             <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setDetailModalVisible(false)}>
+         {/* --- FLOOR MANAGER MODAL --- */}
+         <Modal visible={isFloorManagerModalVisible} onRequestClose={backToOptions} transparent={true} animationType="fade">
+             <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={backToOptions}>
                  {selectedSystem && (
-                     <TouchableOpacity style={[styles.modalView, styles.detailModalView]} activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+                     <TouchableOpacity style={[styles.modalView, styles.floorManagerModalView]} activeOpacity={1} onPress={(e) => e.stopPropagation()}>
                          <Text style={styles.modalTitle}>{selectedSystem.name}</Text>
                          <Text style={styles.detailDescription}>{selectedSystem.description || 'No description.'}</Text>
                          <Text style={styles.floorListTitle}>Floors: (Long press to reorder)</Text>
@@ -510,10 +525,10 @@ export default function HomeScreen() {
                          <TouchableOpacity style={[styles.button, styles.addFloorButton]} onPress={openAddFloorModalHandler}>
                              <Text style={styles.buttonText}>+ Add Floor</Text>
                          </TouchableOpacity>
-                         <TouchableOpacity style={[styles.button, styles.editAllPinsButton]} onPress={openEditPinsModalHandler}>
-                             <Text style={styles.buttonText}>Edit Pin Assignments</Text>
-                         </TouchableOpacity>
                           {isSavingOrder && <ActivityIndicator size="small" color="#aaa" style={styles.savingIndicator} />}
+                         <TouchableOpacity style={[styles.button, styles.cancelButton, {marginTop: 10, marginRight: 0}]} onPress={backToOptions}>
+                            <Text style={styles.buttonText}>Back to Options</Text>
+                         </TouchableOpacity>
                      </TouchableOpacity>
                  )}
              </TouchableOpacity>
@@ -521,13 +536,13 @@ export default function HomeScreen() {
 
 
         {/* --- ADD FLOOR MODAL --- */}
-        <Modal visible={isAddFloorModalVisible} onRequestClose={() => setAddFloorModalVisible(false)} transparent={true} animationType="fade">
+        <Modal visible={isAddFloorModalVisible} onRequestClose={backToFloorManager} transparent={true} animationType="fade">
            <View style={styles.modalBackdrop}>
                <View style={styles.modalView}>
                   <Text style={styles.modalTitle}>Add New Floor to {selectedSystem?.name}</Text>
                   <TextInput style={styles.input} placeholder="Floor Name" placeholderTextColor="#666" value={newFloorName} onChangeText={setNewFloorName} autoFocus={true}/>
                   <View style={styles.modalActions}>
-                    <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setAddFloorModalVisible(false)}>
+                    <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={backToFloorManager}>
                       <Text style={styles.buttonText}>Cancel</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleAddFloor}>
@@ -537,9 +552,75 @@ export default function HomeScreen() {
                </View>
             </View>
         </Modal>
+        
+        {/* --- SYSTEM OPTIONS MODAL --- */}
+        <Modal visible={isSystemOptionsModalVisible} onRequestClose={() => setSystemOptionsModalVisible(false)} transparent={true} animationType="fade">
+           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setSystemOptionsModalVisible(false)}>
+               <View style={[styles.modalView, styles.systemOptionsModalView]}>
+                  <Text style={styles.modalTitle}>{selectedSystem?.name}</Text>
+                  
+                  <TouchableOpacity 
+                    style={[styles.button, styles.optionButton]} 
+                    onPress={() => {
+                        setSystemOptionsModalVisible(false);
+                        setFloorManagerModalVisible(true); // Open floor manager
+                    }}>
+                    <Text style={styles.buttonText}>Manage Floors</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.button, styles.optionButton]} 
+                    onPress={() => {
+                        openEditPinsModalHandler(); // Open pin editor
+                    }}>
+                    <Text style={styles.buttonText}>Edit Pin Assignments</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[
+                        styles.button, 
+                        styles.optionButton, 
+                        !hasAssignedPins && styles.buttonDisabled
+                    ]} 
+                    disabled={!hasAssignedPins}
+                    onPress={() => {
+                        setSystemOptionsModalVisible(false);
+                        setGenerateGraphsModalVisible(true); // Open graph window
+                    }}>
+                    <Text style={[styles.buttonText, !hasAssignedPins && styles.buttonTextDisabled]}>Generate Graphs</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.button, styles.cancelButton, {marginTop: 15, marginRight: 0}]} 
+                    onPress={() => setSystemOptionsModalVisible(false)}>
+                    <Text style={styles.buttonText}>Cancel</Text>
+                  </TouchableOpacity>
+               </View>
+            </TouchableOpacity>
+        </Modal>
+
+        {/* --- GENERATE GRAPHS MODAL --- */}
+        <Modal visible={isGenerateGraphsModalVisible} onRequestClose={backToOptions} transparent={true} animationType="fade">
+           <View style={styles.modalBackdrop}>
+               <View style={styles.largeModalView}>
+                  <Text style={styles.modalTitle}>Graphs for {selectedSystem?.name}</Text>
+                  
+                  <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+                    <Text style={{color: '#fff'}}>Graph content will be here...</Text>
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={[styles.button, styles.cancelButton, {alignSelf: 'center', minWidth: 200, marginTop: 20, marginRight: 0}]} 
+                    onPress={backToOptions}>
+                    <Text style={styles.buttonText}>Back to Options</Text>
+                  </TouchableOpacity>
+               </View>
+            </View>
+        </Modal>
+
 
         {/* --- EDIT PINS MODAL --- */}
-        <Modal visible={isEditPinsModalVisible} onRequestClose={closeEditPinsModal} transparent={true} animationType="fade">
+        <Modal visible={isEditPinsModalVisible} onRequestClose={cancelEditPins} transparent={true} animationType="fade">
            <View style={styles.modalBackdrop}>
                <View style={[styles.modalView, styles.editPinsModalView]}>
                   <Text style={styles.modalTitle}>Assign Pins for {tempPinAssignments?.name}</Text>
@@ -586,7 +667,7 @@ export default function HomeScreen() {
                     </View>
                   </ScrollView>
                   <View style={styles.modalActions}>
-                    <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={closeEditPinsModal}>
+                    <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={cancelEditPins}>
                       <Text style={styles.buttonText}>Cancel</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleUpdateSystemPinAssignments}>
@@ -693,8 +774,36 @@ const styles = StyleSheet.create({
     saveButton: { backgroundColor: '#007AFF', flex: 1 },
     buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
     saveButtonText: { color: '#fff' },
-    // Detail Modal Styles
-    detailModalView: { maxHeight: '85%', width: '90%', maxWidth: 550 },
+    
+    // --- NEW/MODIFIED STYLES ---
+    systemOptionsModalView: {
+        width: '90%',
+        maxWidth: 350,
+        backgroundColor: '#1E1E1E',
+        borderRadius: 20,
+        padding: 25,
+        alignItems: 'stretch',
+    },
+    optionButton: {
+        backgroundColor: '#007AFF',
+        marginBottom: 10,
+    },
+    buttonDisabled: {
+        backgroundColor: '#555',
+        opacity: 0.7,
+    },
+    buttonTextDisabled: {
+        color: '#999',
+    },
+    largeModalView: {
+        width: '80%',
+        height: '80%',
+        backgroundColor: '#1E1E1E',
+        borderRadius: 20,
+        padding: 25,
+        alignItems: 'stretch',
+    },
+    floorManagerModalView: { maxHeight: '85%', width: '90%', maxWidth: 550 },
     detailDescription: { color: '#b0b0b0', fontSize: 15, textAlign: 'center', marginBottom: 20, },
     floorListTitle: { fontSize: 16, fontWeight: '600', color: '#ccc', marginBottom: 10, borderBottomWidth: 1, borderBottomColor: '#444', paddingBottom: 5 },
     floorList: { width: '100%', maxHeight: 300, marginBottom: 15 },
