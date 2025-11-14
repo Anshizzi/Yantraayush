@@ -63,7 +63,7 @@ export default function LoginScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
         <BlurView intensity={50} tint="dark" style={styles.card}>
           <View style={styles.logoPlaceholder} />
-          <Text style={styles.brandName}>YANTAAYUSH</Text>
+          <Text style={styles.brandName}>YANTRAAYUSH</Text>
           <Text style={styles.subtitle}>Sign in to your account</Text>
 
           <View style={styles.inputContainer}>
