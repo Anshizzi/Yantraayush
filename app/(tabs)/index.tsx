@@ -1,5 +1,5 @@
 // File: frontend/app/(tabs)/index.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
   FlatList, // Use FlatList for the main grid
@@ -10,6 +10,11 @@ import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-nativ
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+// --- NEW Graphing Imports ---
+import {
+  VictoryChart, VictoryLine, VictoryScatter, VictoryAxis, VictoryTheme, VictoryZoomContainer
+} from 'victory-native';
+// Svg is NOT imported directly, Victory components handle it
 
 const API_BASE = Platform.select({
   ios: "http://localhost:8000",
@@ -32,6 +37,14 @@ interface System {
   description: string;
   floors: Floor[];
 }
+
+// --- NEW Data Interfaces ---
+interface LiveDataPoint {
+  [key: string]: number; // e.g., { "P1": 5.2, "P2": 10.1 }
+  timestamp: number; // For time-series
+}
+type LiveDataHistory = LiveDataPoint[];
+
 
 // Timezone Display
 const TimezoneDisplay = () => {
@@ -57,6 +70,9 @@ const numGridCols = 4;
 const totalGapSpace = (numGridCols - 1) * gap;
 const cardWidth = (windowWidth - 40 - totalGapSpace) / numGridCols;
 
+// --- Chart Colors ---
+const chartColors = ["#00FFC2", "#FF5733", "#FFC300", "#5856D6", "#34AADC", "#DA34DC", "#34DC75", "#DC345B"];
+
 export default function HomeScreen() {
   const [systems, setSystems] = useState<System[]>([]);
   const [isAddSystemModalVisible, setAddSystemModalVisible] = useState(false);
@@ -76,6 +92,16 @@ export default function HomeScreen() {
   const [newSystemName, setNewSystemName] = useState('');
   const [newSystemDescription, setNewSystemDescription] = useState('');
   const [newFloorName, setNewFloorName] = useState('');
+
+  // --- Graph State ---
+  const [liveDataHistory, setLiveDataHistory] = useState<LiveDataHistory>([]);
+  const [activeGraphTab, setActiveGraphTab] = useState<'time' | 'xy'>('time');
+  const [allSystemPins, setAllSystemPins] = useState<string[]>([]);
+  const [timeSeriesPins, setTimeSeriesPins] = useState<Set<string>>(new Set());
+  const [xyPlotPins, setXyPlotPins] = useState<{x: string, y: string}>({ x: '', y: '' });
+  const dataFetchInterval = useRef<NodeJS.Timeout | null>(null);
+  const [isGraphLoading, setIsGraphLoading] = useState(true);
+  const [graphError, setGraphError] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -172,7 +198,6 @@ export default function HomeScreen() {
           ));
           setSelectedSystem(updatedSystemData);
           setNewFloorName('');
-          // Go back to floor manager after adding
           backToFloorManager(); 
 
       } catch (error: any) {
@@ -312,6 +337,77 @@ export default function HomeScreen() {
       }
   };
 
+  const fetchLivePinData = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/systems/live_data`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || 'Failed to fetch live data');
+      }
+      const newData: Omit<LiveDataPoint, 'timestamp'> = await response.json();
+      
+      const dataPointWithTimestamp: LiveDataPoint = {
+        ...newData,
+        timestamp: Date.now()
+      };
+
+      setLiveDataHistory(prevHistory => {
+        const newHistory = [...prevHistory, dataPointWithTimestamp];
+        if (newHistory.length > 50) {
+          return newHistory.slice(newHistory.length - 50);
+        }
+        return newHistory;
+      });
+      
+      if (isGraphLoading) setIsGraphLoading(false);
+      if (graphError) setGraphError(null);
+
+    } catch (error: any) {
+      console.error(error.message);
+      if (dataFetchInterval.current) {
+        clearInterval(dataFetchInterval.current);
+        dataFetchInterval.current = null;
+      }
+      setIsGraphLoading(false);
+      setGraphError("No data is being received from the external API. Please ensure the data source is active and try again.");
+    }
+  };
+
+  useEffect(() => {
+    if (isGenerateGraphsModalVisible && selectedSystem) {
+      setIsGraphLoading(true);
+      setGraphError(null);
+      setLiveDataHistory([]);
+      
+      const pins = new Set<string>();
+      selectedSystem.floors.forEach(floor => {
+        floor.pins.forEach(pin => pins.add(pin));
+      });
+      const pinList = Array.from(pins).sort();
+      setAllSystemPins(pinList);
+
+      setTimeSeriesPins(new Set(pinList));
+      setXyPlotPins({ x: pinList[0] || '', y: pinList[1] || pinList[0] || '' });
+
+      dataFetchInterval.current = setInterval(fetchLivePinData, 1500);
+    
+    } else {
+      if (dataFetchInterval.current) {
+        clearInterval(dataFetchInterval.current);
+        dataFetchInterval.current = null;
+      }
+    }
+    return () => {
+      if (dataFetchInterval.current) {
+        clearInterval(dataFetchInterval.current);
+        dataFetchInterval.current = null;
+      }
+    };
+  }, [isGenerateGraphsModalVisible, selectedSystem]);
+
 
   // --- Modal Open/Close Handlers ---
   const openAddSystemModalHandler = () => {
@@ -330,18 +426,18 @@ export default function HomeScreen() {
   const openAddFloorModalHandler = () => {
     if (!selectedSystem) return;
     setNewFloorName('');
-    setFloorManagerModalVisible(false); // Close floor manager
-    setAddFloorModalVisible(true); // Open add floor
+    setFloorManagerModalVisible(false);
+    setAddFloorModalVisible(true);
    };
 
   const openEditPinsModalHandler = () => {
     if (!selectedSystem) return;
     setTempPinAssignments(JSON.parse(JSON.stringify(selectedSystem)));
     setSystemOptionsModalVisible(false);
+    setFloorManagerModalVisible(false);
     setEditPinsModalVisible(true);
   };
   
-  // --- NEW Navigation Functions ---
   const backToOptions = () => {
     setFloorManagerModalVisible(false);
     setEditPinsModalVisible(false);
@@ -357,7 +453,7 @@ export default function HomeScreen() {
   const cancelEditPins = () => {
     setEditPinsModalVisible(false);
     setTempPinAssignments(null);
-    backToOptions(); // Go back to options instead of closing
+    backToOptions();
   };
 
   // --- Drag and Drop Handler ---
@@ -395,6 +491,22 @@ export default function HomeScreen() {
         updatedSystem.floors[currentFloorIndex].pins.push(pin);
     }
     setTempPinAssignments(updatedSystem);
+  };
+
+  const toggleTimeSeriesPin = (pin: string) => {
+    setTimeSeriesPins(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(pin)) {
+        newSet.delete(pin);
+      } else {
+        newSet.add(pin);
+      }
+      return newSet;
+    });
+  };
+
+  const setXyPin = (axis: 'x' | 'y', pin: string) => {
+    setXyPlotPins(prev => ({ ...prev, [axis]: pin }));
   };
 
 
@@ -563,7 +675,7 @@ export default function HomeScreen() {
                     style={[styles.button, styles.optionButton]} 
                     onPress={() => {
                         setSystemOptionsModalVisible(false);
-                        setFloorManagerModalVisible(true); // Open floor manager
+                        setFloorManagerModalVisible(true);
                     }}>
                     <Text style={styles.buttonText}>Manage Floors</Text>
                   </TouchableOpacity>
@@ -571,7 +683,7 @@ export default function HomeScreen() {
                   <TouchableOpacity 
                     style={[styles.button, styles.optionButton]} 
                     onPress={() => {
-                        openEditPinsModalHandler(); // Open pin editor
+                        openEditPinsModalHandler();
                     }}>
                     <Text style={styles.buttonText}>Edit Pin Assignments</Text>
                   </TouchableOpacity>
@@ -585,7 +697,7 @@ export default function HomeScreen() {
                     disabled={!hasAssignedPins}
                     onPress={() => {
                         setSystemOptionsModalVisible(false);
-                        setGenerateGraphsModalVisible(true); // Open graph window
+                        setGenerateGraphsModalVisible(true);
                     }}>
                     <Text style={[styles.buttonText, !hasAssignedPins && styles.buttonTextDisabled]}>Generate Graphs</Text>
                   </TouchableOpacity>
@@ -605,12 +717,120 @@ export default function HomeScreen() {
                <View style={styles.largeModalView}>
                   <Text style={styles.modalTitle}>Graphs for {selectedSystem?.name}</Text>
                   
-                  <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-                    <Text style={{color: '#fff'}}>Graph content will be here...</Text>
+                  <View style={styles.graphTabsContainer}>
+                    <TouchableOpacity 
+                      style={[styles.graphTab, activeGraphTab === 'time' && styles.graphTabActive]}
+                      onPress={() => setActiveGraphTab('time')}
+                    >
+                      <Text style={[styles.graphTabText, activeGraphTab === 'time' && styles.graphTabTextActive]}>Time Series</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.graphTab, activeGraphTab === 'xy' && styles.graphTabActive]}
+                      onPress={() => setActiveGraphTab('xy')}
+                    >
+                      <Text style={[styles.graphTabText, activeGraphTab === 'xy' && styles.graphTabTextActive]}>X-Y Plot</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.graphContent}>
+                    {isGraphLoading ? (
+                      <ActivityIndicator size="large" color="#00FFC2" style={{flex: 1}} />
+                    ) : graphError ? (
+                      <View style={styles.graphErrorContainer}>
+                        <MaterialCommunityIcons name="alert-circle-outline" size={48} color="#e74c3c" />
+                        <Text style={styles.graphErrorText}>{graphError}</Text>
+                        <TouchableOpacity 
+                          style={[styles.button, styles.cancelButton, {marginTop: 20, flex: 0, paddingHorizontal: 20, marginRight: 0}]} 
+                          onPress={fetchLivePinData}
+                        >
+                          <Text style={styles.buttonText}>Retry</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <>
+                        <View style={styles.chartControls}>
+                          {activeGraphTab === 'time' && (
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                              {allSystemPins.map((pin, index) => (
+                                <TouchableOpacity 
+                                  key={pin} 
+                                  style={[styles.pinToggle, timeSeriesPins.has(pin) && {backgroundColor: chartColors[index % chartColors.length]}]}
+                                  onPress={() => toggleTimeSeriesPin(pin)}
+                                >
+                                  <Text style={[styles.pinToggleText, timeSeriesPins.has(pin) && {color: '#000'}]}>{pin}</Text>
+                                </TouchableOpacity>
+                              ))}
+                            </ScrollView>
+                          )}
+                          {activeGraphTab === 'xy' && (
+                            <View style={styles.xyControls}>
+                              <Text style={styles.xyLabel}>X-Axis:</Text>
+                              {allSystemPins.map((pin) => (
+                                <TouchableOpacity 
+                                  key={`x-${pin}`} 
+                                  style={[styles.pinToggleSmall, xyPlotPins.x === pin && {backgroundColor: '#007AFF'}]}
+                                  onPress={() => setXyPin('x', pin)}
+                                >
+                                  <Text style={[styles.pinToggleTextSmall, xyPlotPins.x === pin && {color: '#fff'}]}>{pin}</Text>
+                                </TouchableOpacity>
+                              ))}
+                              <Text style={styles.xyLabel}>Y-Axis:</Text>
+                              {allSystemPins.map((pin) => (
+                                <TouchableOpacity 
+                                  key={`y-${pin}`} 
+                                  style={[styles.pinToggleSmall, xyPlotPins.y === pin && {backgroundColor: '#007AFF'}]}
+                                  onPress={() => setXyPin('y', pin)}
+                                >
+                                  <Text style={[styles.pinToggleTextSmall, xyPlotPins.y === pin && {color: '#fff'}]}>{pin}</Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+
+                        <View style={styles.chartContainer}>
+                            <VictoryChart theme={victoryChartTheme} 
+                              padding={{ top: 20, bottom: 40, left: 50, right: 30 }}
+                              containerComponent={<VictoryZoomContainer zoomDimension="x" />}
+                            >
+                              <VictoryAxis dependentAxis tickFormat={(t) => `${t}`} />
+                              <VictoryAxis tickFormat={(t) => new Date(t).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', second: '2-digit'})} />
+
+                              {activeGraphTab === 'time' && (
+                                <>
+                                  {allSystemPins.map((pin, index) => {
+                                    if (!timeSeriesPins.has(pin)) return null;
+                                    return (
+                                      <VictoryLine
+                                        key={pin}
+                                        data={liveDataHistory}
+                                        x="timestamp"
+                                        y={pin}
+                                        style={{ data: { stroke: chartColors[index % chartColors.length] } }}
+                                      />
+                                    );
+                                  })}
+                                </>
+                              )}
+
+                              {activeGraphTab === 'xy' && (
+                                <VictoryScatter
+                                  data={liveDataHistory}
+                                  x={xyPlotPins.x}
+                                  y={xyPlotPins.y}
+                                  style={{ data: { fill: "#00FFC2" } }}
+                                  size={2}
+                                />
+                              )}
+                            </VictoryChart>
+                        </View>
+                      </>
+                    )}
                   </View>
                   
+                  {/* MODIFIED Button Style */}
                   <TouchableOpacity 
-                    style={[styles.button, styles.cancelButton, {alignSelf: 'center', minWidth: 200, marginTop: 20, marginRight: 0}]} 
+                    style={[styles.button, styles.backButton]} 
                     onPress={backToOptions}>
                     <Text style={styles.buttonText}>Back to Options</Text>
                   </TouchableOpacity>
@@ -684,6 +904,28 @@ export default function HomeScreen() {
       </SafeAreaView>
   );
 }
+
+// --- NEW Chart Theme ---
+const victoryChartTheme = {
+  axis: {
+    style: {
+      axis: { stroke: '#888' },
+      tickLabels: { fill: '#aaa', fontSize: 10, padding: 5 },
+      grid: { stroke: '#444', strokeDasharray: '4, 8' },
+    },
+  },
+  line: {
+    style: {
+      data: { strokeWidth: 2 },
+    },
+  },
+  scatter: {
+     style: {
+      data: { fill: '#00FFC2' },
+    },
+  }
+};
+
 
 // --- Styles ---
 const styles = StyleSheet.create({
@@ -775,7 +1017,6 @@ const styles = StyleSheet.create({
     buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
     saveButtonText: { color: '#fff' },
     
-    // --- NEW/MODIFIED STYLES ---
     systemOptionsModalView: {
         width: '90%',
         maxWidth: 350,
@@ -795,13 +1036,100 @@ const styles = StyleSheet.create({
     buttonTextDisabled: {
         color: '#999',
     },
+    
     largeModalView: {
         width: '80%',
         height: '80%',
         backgroundColor: '#1E1E1E',
         borderRadius: 20,
         padding: 25,
-        alignItems: 'stretch',
+        alignItems: 'stretch', // This is correct
+    },
+    graphTabsContainer: {
+      flexDirection: 'row',
+      marginBottom: 15,
+      borderBottomWidth: 1,
+      borderBottomColor: '#444',
+    },
+    graphTab: {
+      flex: 1,
+      paddingVertical: 10,
+      alignItems: 'center',
+    },
+    graphTabActive: {
+      borderBottomWidth: 2,
+      borderBottomColor: '#00FFC2',
+    },
+    graphTabText: {
+      color: '#aaa',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    graphTabTextActive: {
+      color: '#00FFC2',
+    },
+    graphContent: {
+      flex: 1,
+      backgroundColor: '#000',
+      borderRadius: 8,
+    },
+    graphErrorContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    graphErrorText: {
+        color: '#aaa',
+        fontSize: 16,
+        textAlign: 'center',
+        marginTop: 15,
+        lineHeight: 22,
+    },
+    chartControls: {
+      padding: 10,
+      backgroundColor: '#2b2b2b',
+      borderTopLeftRadius: 8,
+      borderTopRightRadius: 8,
+    },
+    pinToggle: {
+      backgroundColor: '#444',
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 15,
+      marginRight: 8,
+    },
+    pinToggleText: {
+      color: '#eee',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    xyControls: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+    },
+    xyLabel: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: 'bold',
+      marginRight: 10,
+      marginLeft: 5,
+    },
+    pinToggleSmall: {
+      backgroundColor: '#444',
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+      borderRadius: 10,
+      marginRight: 5,
+      marginBottom: 5,
+    },
+    pinToggleTextSmall: {
+      color: '#eee',
+      fontSize: 11,
+    },
+    chartContainer: {
+      flex: 1,
     },
     floorManagerModalView: { maxHeight: '85%', width: '90%', maxWidth: 550 },
     detailDescription: { color: '#b0b0b0', fontSize: 15, textAlign: 'center', marginBottom: 20, },
@@ -857,12 +1185,15 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     pinCellSelected: {
-        backgroundColor: '#2ecc71', // Green
-        borderColor: '#27ae60',
+        backgroundColor: '#2ecc71',
     },
     pinCellTaken: {
-        backgroundColor: '#e74c3c', // Red
-        borderColor: '#c0392b',
+        backgroundColor: '#e74c3c',
         opacity: 0.7,
+    },
+    
+    backButton: {
+        backgroundColor: '#333',
+        marginTop: 20, 
     },
 });
