@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
-  FlatList, // Use FlatList for the main grid
+  FlatList, // FlatList for the main grid
   TextInput, Alert, StatusBar, Modal, Dimensions, Platform, ScrollView, ActivityIndicator
 } from 'react-native';
 // Import DraggableFlatList separately
@@ -10,7 +10,6 @@ import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-nativ
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-// --- NEW Graphing Imports ---
 import {
   VictoryChart, VictoryLine, VictoryScatter, VictoryAxis, VictoryTheme, VictoryZoomContainer
 } from 'victory-native';
@@ -409,7 +408,7 @@ export default function HomeScreen() {
   }, [isGenerateGraphsModalVisible, selectedSystem]);
 
 
-  // --- Modal Open/Close Handlers ---
+  // Modal Open/Close Handlers
   const openAddSystemModalHandler = () => {
     setNewSystemName('');
     setNewSystemDescription('');
@@ -1165,7 +1164,6 @@ const styles = StyleSheet.create({
     editAllPinsButton: { backgroundColor: '#5856D6', alignSelf: 'stretch' },
     savingIndicator: { marginTop: 10, },
 
-    // Edit Pins Modal Styles
     editPinsModalView: { width: '95%', maxWidth: 800 },
     pinMatrixScrollView: { paddingBottom: 10 },
     pinMatrixRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 5},

@@ -14,7 +14,6 @@ const API_BASE = Platform.select({
   default: 'http://localhost:8000',
 });
 
-// Change this to '/register' if the backend route has no '/auth' prefix
 const SIGNUP_PATH = '/auth/register';
 
 export default function SignUpScreen() {
@@ -22,6 +21,14 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  const navigateBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/'); 
+    }
+  };
 
   const handleSignUp = async () => {
     if (!email || !password) {
@@ -38,19 +45,29 @@ export default function SignUpScreen() {
         body: JSON.stringify({ email, password }),
       });
 
-      // Safely parse JSON (backend might return non-JSON on errors)
       let data: any = null;
       try { data = await res.json(); } catch {}
 
       if (!res.ok) {
-        const msg =
-          (data && (data.detail || data.message || data.error)) ||
-          `Sign-up failed (${res.status})`;
+        // Specifically handle the 400 "Email already registered" error
+        if (res.status === 400 && data?.detail === "Email already registered") {
+          Alert.alert(
+            'Account Exists',
+            'This email is already registered. Would you like to sign in instead?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Sign In', onPress: () => navigateBack() }
+            ]
+          );
+          return;
+        }
+
+        const msg = (data && data.detail) || `Sign-up failed (${res.status})`;
         throw new Error(msg);
       }
 
       Alert.alert('Success', 'Account created! Please sign in.');
-      router.back();
+      navigateBack(); 
     } catch (error: any) {
       Alert.alert('Sign-Up Error', error?.message || 'Could not create account.');
     } finally {
@@ -69,7 +86,6 @@ export default function SignUpScreen() {
         isMuted
         resizeMode="cover"
         useNativeControls={false}
-        posterSource={undefined}
       />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
         <BlurView intensity={50} tint="dark" style={styles.card}>
@@ -110,7 +126,7 @@ export default function SignUpScreen() {
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => router.back()} disabled={loading}>
+            <TouchableOpacity onPress={navigateBack} disabled={loading}>
               <Text style={styles.linkText}>Sign In</Text>
             </TouchableOpacity>
           </View>
