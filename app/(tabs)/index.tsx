@@ -78,6 +78,7 @@ export default function HomeScreen() {
   const [isFloorManagerModalVisible, setFloorManagerModalVisible] = useState(false);
   const [isAddFloorModalVisible, setAddFloorModalVisible] = useState(false);
   const [isEditPinsModalVisible, setEditPinsModalVisible] = useState(false);
+  const [isPinSettingsModalVisible, setPinSettingsModalVisible] = useState(false); // NEW
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   
   const [isSystemOptionsModalVisible, setSystemOptionsModalVisible] = useState(false);
@@ -91,6 +92,12 @@ export default function HomeScreen() {
   const [newSystemName, setNewSystemName] = useState('');
   const [newSystemDescription, setNewSystemDescription] = useState('');
   const [newFloorName, setNewFloorName] = useState('');
+
+  // --- New Config States for Pin Settings Feature ---
+  const [config1, setConfig1] = useState('clck');
+  const [config2, setConfig2] = useState('Test Signal');
+  const [config3, setConfig3] = useState('PDB');
+  const [fault, setFault] = useState('COMP TH');
 
   // --- Graph State ---
   const [liveDataHistory, setLiveDataHistory] = useState<LiveDataHistory>([]);
@@ -436,11 +443,18 @@ export default function HomeScreen() {
     setFloorManagerModalVisible(false);
     setEditPinsModalVisible(true);
   };
+
+  const openPinSettingsModalHandler = () => {
+    if (!selectedSystem) return;
+    setSystemOptionsModalVisible(false);
+    setPinSettingsModalVisible(true);
+  };
   
   const backToOptions = () => {
     setFloorManagerModalVisible(false);
     setEditPinsModalVisible(false);
     setGenerateGraphsModalVisible(false);
+    setPinSettingsModalVisible(false);
     setSystemOptionsModalVisible(true);
   };
 
@@ -687,6 +701,15 @@ export default function HomeScreen() {
                     <Text style={styles.buttonText}>Edit Pin Assignments</Text>
                   </TouchableOpacity>
 
+                  {/* NEW PIN SETTINGS BUTTON */}
+                  <TouchableOpacity 
+                    style={[styles.button, styles.optionButton]} 
+                    onPress={() => {
+                        openPinSettingsModalHandler();
+                    }}>
+                    <Text style={styles.buttonText}>Pin Settings</Text>
+                  </TouchableOpacity>
+
                   <TouchableOpacity 
                     style={[
                         styles.button, 
@@ -708,6 +731,58 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                </View>
             </TouchableOpacity>
+        </Modal>
+
+        {/* --- NEW PIN SETTINGS MODAL --- */}
+        <Modal visible={isPinSettingsModalVisible} transparent animationType="slide">
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.modalView, {width: '90%', maxWidth: 450}]}>
+              <Text style={styles.modalTitle}>System Configuration</Text>
+              
+              <View style={styles.configGroup}>
+                <Text style={styles.configHeader}>Config 1</Text>
+                <View style={styles.chipRow}>
+                  {['clck', 'dr'].map(opt => (
+                    <TouchableOpacity key={opt} style={[styles.chip, config1 === opt && styles.chipActive]} onPress={() => setConfig1(opt)}>
+                      <Text style={[styles.chipText, config1 === opt && {color: '#000'}]}>{opt.toUpperCase()}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.configGroup}>
+                <Text style={styles.configHeader}>Config 2</Text>
+                <View style={styles.chipRow}>
+                  {['Test Signal', 'Test Amplifier', 'Test Frequency'].map(opt => (
+                    <TouchableOpacity key={opt} style={[styles.chip, config2 === opt && styles.chipActive]} onPress={() => setConfig2(opt)}>
+                      <Text style={[styles.chipText, config2 === opt && {color: '#000'}]}>{opt}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.configGroup}>
+                <Text style={styles.configHeader}>Config 3</Text>
+                <View style={styles.chipRow}>
+                  {['PDB', 'Vref', 'Opm ref'].map(opt => (
+                    <TouchableOpacity key={opt} style={[styles.chip, config3 === opt && styles.chipActive]} onPress={() => setConfig3(opt)}>
+                      <Text style={[styles.chipText, config3 === opt && {color: '#000'}]}>{opt}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.configGroup}>
+                <Text style={styles.configHeader}>Fault</Text>
+                <View style={styles.faultDisplay}><Text style={styles.faultText}>{fault}</Text></View>
+              </View>
+
+              {/* FIXED BUTTON PROPORTIONS*/}
+              <TouchableOpacity style={[styles.button, styles.backButton]} onPress={backToOptions}>
+                <Text style={styles.buttonText}>Apply & Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </Modal>
 
         {/* --- GENERATE GRAPHS MODAL --- */}
@@ -827,7 +902,6 @@ export default function HomeScreen() {
                     )}
                   </View>
                   
-                  {/* MODIFIED Button Style */}
                   <TouchableOpacity 
                     style={[styles.button, styles.backButton]} 
                     onPress={backToOptions}>
@@ -1147,10 +1221,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#3a3a3a',
         opacity: 0.9,
         shadowColor: "#000",
-        shadowOffset: {	width: 0, height: 2, },
-	    shadowOpacity: 0.25,
-	    shadowRadius: 3.84,
-	    elevation: 5,
+        shadowOffset: { width: 0, height: 2, },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+      elevation: 5,
     },
     dragHandle: {
         marginRight: 10,
@@ -1193,5 +1267,17 @@ const styles = StyleSheet.create({
     backButton: {
         backgroundColor: '#333',
         marginTop: 20, 
+        width: '100%', 
+        alignSelf: 'center',  
     },
+
+    // NEW PIN SETTINGS STYLES
+    configGroup: { marginBottom: 15 },
+    configHeader: { color: '#00FFC2', fontSize: 14, fontWeight: 'bold', marginBottom: 8 },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    chip: { paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#333', borderRadius: 8 },
+    chipActive: { backgroundColor: '#00FFC2' },
+    chipText: { color: '#eee', fontSize: 12 },
+    faultDisplay: { backgroundColor: 'rgba(255,107,107,0.1)', padding: 12, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#ff6b6b' },
+    faultText: { color: '#ff6b6b', fontWeight: 'bold' }
 });
