@@ -1,3 +1,4 @@
+// frontend/app/%28tabs%29/_layout.tsx - Layout component for the bottom tab navigation in the Expo Router application, defining the structure and styling of the tabs and their icons.
 import { Tabs } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 

@@ -1,3 +1,4 @@
+// frontend/app/%2Bnot-found.tsx - Custom 404 Not Found screen for the Expo Router application, providing a user-friendly message and a link to navigate back to the home screen when a non-existent route is accessed.
 import { Link, Stack } from 'expo-router';
 import { StyleSheet } from 'react-native';
 

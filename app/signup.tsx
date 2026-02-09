@@ -1,3 +1,4 @@
+// frontend/app/signup.tsx - Sign-up screen component for the Expo Router application, allowing users to create a new account by entering their email and password, with error handling and navigation back to the sign-in screen if the email is already registered.
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,

@@ -5,7 +5,6 @@ import {
   FlatList, // FlatList for the main grid
   TextInput, Alert, StatusBar, Modal, Dimensions, Platform, ScrollView, ActivityIndicator
 } from 'react-native';
-// Import DraggableFlatList separately
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -180,7 +179,7 @@ export default function HomeScreen() {
         return;
       }
       const trimmedName = newFloorName.trim();
-      const nameExists = selectedSystem.floors.some(
+      const nameExists = (selectedSystem.floors || []).some(
           floor => floor.name.toLowerCase() === trimmedName.toLowerCase()
       );
       if (nameExists) {
@@ -424,7 +423,7 @@ export default function HomeScreen() {
 
   const openSystemOptionsModal = (system: System) => {
     setSelectedSystem(system);
-    const hasPins = system.floors.some(floor => floor.pins.length > 0);
+    const hasPins = system.floors?.some(floor => (floor.pins || []).length > 0) || false;
     setHasAssignedPins(hasPins);
     setSystemOptionsModalVisible(true);
   };
@@ -540,7 +539,7 @@ export default function HomeScreen() {
                  </Text>
             ) : null }
             <ScrollView style={styles.floorListInCard} nestedScrollEnabled={true}>
-                {item.floors.length > 0 ? (
+                {item?.floors?.length > 0 ? (
                     item.floors.map(floor => (
                         <View key={floor.id} style={styles.floorStatusItem}>
                             <View style={[
@@ -640,7 +639,7 @@ export default function HomeScreen() {
                          <Text style={styles.detailDescription}>{selectedSystem.description || 'No description.'}</Text>
                          <Text style={styles.floorListTitle}>Floors: (Long press to reorder)</Text>
                           <DraggableFlatList
-                              data={selectedSystem.floors}
+                              data={selectedSystem?.floors || []}
                               keyExtractor={(floor) => floor.id}
                               renderItem={renderFloorItem}
                               onDragEnd={handleDragEnd}
@@ -925,9 +924,9 @@ export default function HomeScreen() {
                                 <View key={pin} style={styles.pinHeaderCell}><Text style={styles.pinMatrixHeaderText}>{pin}</Text></View>
                             ))}
                         </View>
-                        {tempPinAssignments?.floors.map((floor) => {
+                        {(tempPinAssignments?.floors || []).map((floor) => {
                             const takenByOthers = new Set<string>();
-                            tempPinAssignments.floors.forEach(otherFloor => {
+                            (tempPinAssignments?.floors || []).forEach(otherFloor => {
                                 if (otherFloor.id !== floor.id) {
                                     otherFloor.pins.forEach(p => takenByOthers.add(p));
                                 }
