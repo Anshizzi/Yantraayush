@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
-  FlatList, // FlatList for the main grid
+  FlatList, 
   TextInput, Alert, StatusBar, Modal, Dimensions, Platform, ScrollView, ActivityIndicator
 } from 'react-native';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
@@ -22,7 +22,6 @@ const API_BASE = Platform.select({
 
 const AVAILABLE_PINS = Array.from({ length: 8 }, (_, i) => `P${i + 1}`);
 
-// --- Interfaces ---
 interface Floor {
   id: string;
   name: string;
@@ -36,15 +35,13 @@ interface System {
   floors: Floor[];
 }
 
-// --- NEW Data Interfaces ---
 interface LiveDataPoint {
-  [key: string]: number; // e.g., { "P1": 5.2, "P2": 10.1 }
-  timestamp: number; // For time-series
+  [key: string]: number; 
+  timestamp: number; 
 }
 type LiveDataHistory = LiveDataPoint[];
 
 
-// Timezone Display
 const TimezoneDisplay = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   useEffect(() => {
@@ -61,14 +58,12 @@ const TimezoneDisplay = () => {
   );
 };
 
-// Layout Constants
 const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
 const gap = 10;
 const numGridCols = 4;
 const totalGapSpace = (numGridCols - 1) * gap;
 const cardWidth = (windowWidth - 40 - totalGapSpace) / numGridCols;
 
-// --- Chart Colors ---
 const chartColors = ["#00FFC2", "#FF5733", "#FFC300", "#5856D6", "#34AADC", "#DA34DC", "#34DC75", "#DC345B"];
 
 export default function HomeScreen() {
@@ -92,13 +87,11 @@ export default function HomeScreen() {
   const [newSystemDescription, setNewSystemDescription] = useState('');
   const [newFloorName, setNewFloorName] = useState('');
 
-  // --- New Config States for Pin Settings Feature ---
   const [config1, setConfig1] = useState('clck');
   const [config2, setConfig2] = useState('Test Signal');
   const [config3, setConfig3] = useState('PDB');
   const [fault, setFault] = useState('COMP TH');
 
-  // --- Graph State ---
   const [liveDataHistory, setLiveDataHistory] = useState<LiveDataHistory>([]);
   const [activeGraphTab, setActiveGraphTab] = useState<'time' | 'xy'>('time');
   const [allSystemPins, setAllSystemPins] = useState<string[]>([]);
@@ -110,7 +103,6 @@ export default function HomeScreen() {
 
   const router = useRouter();
 
-  // --- API Call Functions ---
 
   const fetchSystems = useCallback(async () => {
     try {
@@ -468,7 +460,6 @@ export default function HomeScreen() {
     backToOptions();
   };
 
-  // --- Drag and Drop Handler ---
   const handleDragEnd = ({ data: reorderedFloors }: { data: Floor[] }) => {
     if (!selectedSystem) return;
     const updatedSystem = { ...selectedSystem, floors: reorderedFloors };
@@ -582,7 +573,6 @@ export default function HomeScreen() {
   }, [selectedSystem, handleDeleteFloor]);
 
 
-  // --- Main Return ---
   return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
@@ -611,7 +601,6 @@ export default function HomeScreen() {
              }
            />
 
-        {/* --- ADD SYSTEM MODAL --- */}
         <Modal visible={isAddSystemModalVisible} onRequestClose={() => setAddSystemModalVisible(false)} transparent={true} animationType="fade" >
            <View style={styles.modalBackdrop}>
                <View style={styles.modalView}>
@@ -630,7 +619,6 @@ export default function HomeScreen() {
             </View>
         </Modal>
 
-         {/* --- FLOOR MANAGER MODAL --- */}
          <Modal visible={isFloorManagerModalVisible} onRequestClose={backToOptions} transparent={true} animationType="fade">
              <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={backToOptions}>
                  {selectedSystem && (
@@ -659,7 +647,6 @@ export default function HomeScreen() {
          </Modal>
 
 
-        {/* --- ADD FLOOR MODAL --- */}
         <Modal visible={isAddFloorModalVisible} onRequestClose={backToFloorManager} transparent={true} animationType="fade">
            <View style={styles.modalBackdrop}>
                <View style={styles.modalView}>
@@ -677,7 +664,6 @@ export default function HomeScreen() {
             </View>
         </Modal>
         
-        {/* --- SYSTEM OPTIONS MODAL --- */}
         <Modal visible={isSystemOptionsModalVisible} onRequestClose={() => setSystemOptionsModalVisible(false)} transparent={true} animationType="fade">
            <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setSystemOptionsModalVisible(false)}>
                <View style={[styles.modalView, styles.systemOptionsModalView]}>
@@ -732,7 +718,6 @@ export default function HomeScreen() {
             </TouchableOpacity>
         </Modal>
 
-        {/* --- NEW PIN SETTINGS MODAL --- */}
         <Modal visible={isPinSettingsModalVisible} transparent animationType="slide">
           <View style={styles.modalBackdrop}>
             <View style={[styles.modalView, {width: '90%', maxWidth: 450}]}>
@@ -776,7 +761,6 @@ export default function HomeScreen() {
                 <View style={styles.faultDisplay}><Text style={styles.faultText}>{fault}</Text></View>
               </View>
 
-              {/* FIXED BUTTON PROPORTIONS*/}
               <TouchableOpacity style={[styles.button, styles.backButton]} onPress={backToOptions}>
                 <Text style={styles.buttonText}>Apply & Close</Text>
               </TouchableOpacity>
@@ -784,7 +768,6 @@ export default function HomeScreen() {
           </View>
         </Modal>
 
-        {/* --- GENERATE GRAPHS MODAL --- */}
         <Modal visible={isGenerateGraphsModalVisible} onRequestClose={backToOptions} transparent={true} animationType="fade">
            <View style={styles.modalBackdrop}>
                <View style={styles.largeModalView}>
@@ -911,7 +894,6 @@ export default function HomeScreen() {
         </Modal>
 
 
-        {/* --- EDIT PINS MODAL --- */}
         <Modal visible={isEditPinsModalVisible} onRequestClose={cancelEditPins} transparent={true} animationType="fade">
            <View style={styles.modalBackdrop}>
                <View style={[styles.modalView, styles.editPinsModalView]}>
@@ -977,7 +959,6 @@ export default function HomeScreen() {
   );
 }
 
-// --- NEW Chart Theme ---
 const victoryChartTheme = {
   axis: {
     style: {
@@ -999,7 +980,6 @@ const victoryChartTheme = {
 };
 
 
-// --- Styles ---
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#000000' },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10, },
@@ -1115,7 +1095,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#1E1E1E',
         borderRadius: 20,
         padding: 25,
-        alignItems: 'stretch', // This is correct
+        alignItems: 'stretch', 
     },
     graphTabsContainer: {
       flexDirection: 'row',
@@ -1270,7 +1250,6 @@ const styles = StyleSheet.create({
         alignSelf: 'center',  
     },
 
-    // NEW PIN SETTINGS STYLES
     configGroup: { marginBottom: 15 },
     configHeader: { color: '#00FFC2', fontSize: 14, fontWeight: 'bold', marginBottom: 8 },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
