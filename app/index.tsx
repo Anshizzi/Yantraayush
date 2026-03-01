@@ -1,5 +1,6 @@
 // frontend/app/index.tsx
 import React, { useState } from 'react';
+
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Alert, Platform, KeyboardAvoidingView, ActivityIndicator, StatusBar
@@ -24,10 +25,15 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password.');
+      // Standard web alert if on browser, otherwise Native Alert
+      if (Platform.OS === 'web') {
+        alert('Please enter both email and password.');
+      } else {
+        Alert.alert('Error', 'Please enter both email and password.');
+      }
       return;
     }
-    if (loading) return;
+    
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/auth/login`, {
@@ -35,13 +41,32 @@ export default function LoginScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
+
+      console.log("Server Status Code:", response.status);
+
+      if (response.status === 401) {
+        setLoading(false);
+        // FIXED FOR WEB
+        if (Platform.OS === 'web') {
+          alert('Wrong password entered. Please try again.');
+        } else {
+          Alert.alert('Login Failed', 'Wrong password entered. Please try again.');
+        }
+        return;
+      }
+
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Login failed');
 
       await AsyncStorage.setItem('token', data.access_token);
       router.replace('/(tabs)/');
+
     } catch (error: any) {
-      Alert.alert('Login Error', error.message || 'Could not connect to the server.');
+      if (Platform.OS === 'web') {
+        alert(error.message || 'Connection failed.');
+      } else {
+        Alert.alert('System Error', error.message || 'Connection failed.');
+      }
     } finally {
       setLoading(false);
     }
@@ -57,9 +82,7 @@ export default function LoginScreen() {
         isLooping
         isMuted
         resizeMode="cover"
-        // For Web reliability with bundled assets
         useNativeControls={false}
-        posterSource={undefined}
       />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
         <BlurView intensity={50} tint="dark" style={styles.card}>
