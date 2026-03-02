@@ -1,6 +1,6 @@
 // frontend/app/index.tsx
-import React, { useState } from 'react';
 
+import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Alert, Platform, KeyboardAvoidingView, ActivityIndicator, StatusBar
@@ -10,6 +10,7 @@ import { Video } from 'expo-av';
 import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import StatusModal from '../components/StatusModal'; // ✅ Added
 
 const API_BASE = Platform.select({
   ios: 'http://localhost:8000',
@@ -21,6 +22,11 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // ✅ Added modal state
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalMsg, setModalMsg] = useState('');
+
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -46,12 +52,8 @@ export default function LoginScreen() {
 
       if (response.status === 401) {
         setLoading(false);
-        // FIXED FOR WEB
-        if (Platform.OS === 'web') {
-          alert('Wrong password entered. Please try again.');
-        } else {
-          Alert.alert('Login Failed', 'Wrong password entered. Please try again.');
-        }
+        setModalMsg('Wrong password entered. Please try again.');
+        setModalVisible(true); // ✅ TRIGGER THE CUSTOM MODAL
         return;
       }
 
@@ -127,6 +129,13 @@ export default function LoginScreen() {
           </View>
         </BlurView>
       </KeyboardAvoidingView>
+
+      {/* ✅ Added Custom Modal */}
+      <StatusModal 
+        visible={modalVisible} 
+        message={modalMsg} 
+        onClose={() => setModalVisible(false)} 
+      />
     </View>
   );
 }

@@ -165,6 +165,27 @@ export default function HomeScreen() {
     }
   };
 
+  const updateGraphFromFile = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/systems/live_data`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+
+      if (result.status === "success") {
+        const newPoint = {
+          x: new Date().toLocaleTimeString(),
+          y: result.payload.value // Adjust based on your file structure
+        };
+        
+        setLiveDataHistory(prev => [...prev.slice(-19), newPoint]);
+      }
+    } catch (error) {
+      console.error("File sync error:", error);
+    }
+  };
+
   const handleAddFloor = async () => {
       if (!newFloorName.trim() || !selectedSystem) {
         Alert.alert('Error', 'Floor name cannot be empty.');
@@ -513,6 +534,30 @@ export default function HomeScreen() {
   };
 
 
+// state to store the metrics
+const [stats, setStats] = useState<any>(null);
+
+// fetch function
+const fetchStats = async () => {
+  try {
+    const token = await AsyncStorage.getItem('token');
+    const response = await fetch(`${API_BASE}/systems/stats`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (data.status === 'success') {
+      setStats(data.metrics);
+    }
+  } catch (error) {
+    console.error("Stats Fetch Error:", error);
+  }
+};
+
+// 3. Call fetchStats when the component loads
+useEffect(() => {
+  fetchStats();
+}, []);
+
   const renderSystemCard = ({ item }: { item: System }) => (
     <TouchableOpacity style={styles.systemCard} onPress={() => openSystemOptionsModal(item)}>
         <View style={styles.systemHeader}>
@@ -528,6 +573,24 @@ export default function HomeScreen() {
                      {item.description}
                  </Text>
             ) : null }
+            {stats && (
+              <View style={styles.statsContainer}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{stats.total_floors}</Text>
+                  <Text style={styles.statLabel}>Total Floors</Text>
+                </View>
+                
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{stats.active_floors}</Text>
+                  <Text style={styles.statLabel}>Active Floors</Text>
+                </View>
+                
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{stats.diversity_score}/8</Text>
+                  <Text style={styles.statLabel}>Pin Types</Text>
+                </View>
+              </View>
+            )}
             <ScrollView style={styles.floorListInCard} nestedScrollEnabled={true}>
                 {item?.floors?.length > 0 ? (
                     item.floors.map(floor => (
@@ -1050,6 +1113,32 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontStyle: 'italic',
         marginTop: 4,
+    },
+    statsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      backgroundColor: 'rgba(255, 255, 255, 0.05)', // Subtle "Glass" background
+      marginHorizontal: 15,
+      marginTop: 10,
+      paddingVertical: 15,
+      borderRadius: 15,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.1)', // Faint border for depth
+    },
+    statItem: { 
+      alignItems: 'center',
+    },
+    statValue: { 
+      color: '#00FFC2', // Cyan glow color
+      fontSize: 18, 
+      fontWeight: 'bold',
+    },
+    statLabel: { 
+      color: '#AAA', 
+      fontSize: 10, 
+      marginTop: 4, 
+      textTransform: 'uppercase',
+      letterSpacing: 1,
     },
     headerActions: { flexDirection: 'row', alignItems: 'center', },
     sendButton: { marginRight: 15, padding: 5, },
