@@ -513,7 +513,6 @@ export default function HomeScreen() {
   };
 
 
-  // --- Render Functions ---
   const renderSystemCard = ({ item }: { item: System }) => (
     <TouchableOpacity style={styles.systemCard} onPress={() => openSystemOptionsModal(item)}>
         <View style={styles.systemHeader}>
