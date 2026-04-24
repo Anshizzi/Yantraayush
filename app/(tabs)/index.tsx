@@ -176,7 +176,7 @@ export default function HomeScreen() {
       if (result.status === "success") {
         const newPoint = {
           x: new Date().toLocaleTimeString(),
-          y: result.payload.value // Adjust based on your file structure
+          y: result.payload.value 
         };
         
         setLiveDataHistory(prev => [...prev.slice(-19), newPoint]);
