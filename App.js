@@ -25,7 +25,7 @@ LogBox.ignoreLogs([
     default: "http://localhost:8000",
   }) || "http://localhost:8000";  */
 
-const API_BASE = "https://your-railway-url.up.railway.app";
+const API_BASE = "https://yantraayush-production.up.railway.app";
 
 export default function App() {
   const [email, setEmail] = useState("");
