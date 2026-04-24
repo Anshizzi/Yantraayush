@@ -1,3 +1,4 @@
+// App.js
 import React, { useState } from "react";
 import {
   View,
@@ -16,13 +17,15 @@ LogBox.ignoreLogs([
   "props.pointerEvents is deprecated",
 ]);
 
-const API_BASE =
+/* const API_BASE =
   Platform.select({
     ios: "http://localhost:8000",
     android: "http://10.0.2.2:8000", // Android emulator localhost
     web: "http://127.0.0.1:8000",    // expo web sometimes uses this
     default: "http://localhost:8000",
-  }) || "http://localhost:8000";
+  }) || "http://localhost:8000";  */
+
+const API_BASE = "https://your-railway-url.up.railway.app";
 
 export default function App() {
   const [email, setEmail] = useState("");
@@ -35,7 +38,7 @@ export default function App() {
         return;
       }
 
-      const response = await fetch(`${API_BOLD}/auth/login`, {
+      const response = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
